@@ -248,7 +248,8 @@ function run(argv) {
   }
 
   if (req.cmd === "launch_codex") {
-    const cwdEsc = String(req.cwd || "").replace(/'/g, "'\\\\''");
+    const sqEsc = String.fromCharCode(39, 92, 39, 39);
+    const cwdEsc = String(req.cwd || "").split("'").join(sqEsc);
     const cdPart = cwdEsc ? ("cd '" + cwdEsc + "' && ") : "";
     const shCmd = cdPart + "(command -v codex >/dev/null 2>&1 && codex || echo 'OpenAI Codex CLI Ready')";
     const term = Application("Terminal");
@@ -421,8 +422,10 @@ class PlatformBridge {
   }
 
   launchCodex(cwd = '') {
-    if (IS_WIN) this._sendWin({ cmd: 'launch_codex', cwd });
-    else if (IS_MAC) this._runMacJxa({ cmd: 'launch_codex', cwd });
+    let safeCwd = '';
+    try { if (cwd && fs.existsSync(cwd) && fs.statSync(cwd).isDirectory()) safeCwd = cwd; } catch (_) {}
+    if (IS_WIN) this._sendWin({ cmd: 'launch_codex', cwd: safeCwd });
+    else if (IS_MAC) this._runMacJxa({ cmd: 'launch_codex', cwd: safeCwd });
   }
 }
 
@@ -1583,10 +1586,12 @@ setInterval(() => {
 // 8. Local HTTP Server (127.0.0.1:17532) & Stream Dock WebSocket Bootstrap
 // ============================================================================
 const srv = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+  const origin = String(req.headers.origin || '');
+  if (origin && origin !== 'null' && !origin.startsWith('file://')) {
+    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: false, error: 'forbidden_origin' }));
+    return;
+  }
 
   if (req.method === 'GET' && req.url === '/state') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1596,7 +1601,12 @@ const srv = http.createServer((req, res) => {
 
   if (req.method === 'POST' && (req.url === '/hook' || req.url === '/simulate')) {
     const chunks = [];
-    req.on('data', (c) => chunks.push(c));
+    let totalBytes = 0;
+    req.on('data', (c) => {
+      totalBytes += c.length;
+      if (totalBytes > 65536) { req.destroy(); return; }
+      chunks.push(c);
+    });
     req.on('end', () => {
       try {
         const body = JSON.parse(Buffer.concat(chunks).toString('utf8').trim() || '{}');
