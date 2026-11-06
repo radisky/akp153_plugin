@@ -1,0 +1,167 @@
+{
+  "Actions": [
+    {
+      "Icon": "static/icon-status.png",
+      "Name": "에이전트 구동 상태",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-status.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "panelMode": "overview",
+        "customLabel": ""
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Claude Code 실시간 구동 상태(대기/동작중/입력대기/완료) 표시 및 터미널 포커스",
+      "UUID": "com.vibecoding.claudecode.status",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-approve.png",
+      "Name": "입력 대기 응답 (승인/중단)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-approve.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "responseType": "approve",
+        "autoFocusTerminal": true
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Claude Code 권한 승인(Enter), 세션 허용(2), 중단(Esc / Ctrl+C)",
+      "UUID": "com.vibecoding.claudecode.approval",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-model.png",
+      "Name": "모델 변경 (5.5 / Fable 5.1)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-model.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "modelMode": "cycle",
+        "targetModel": "sonnet",
+        "sendSlashCommand": true
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Claude Code 모델 순환/지정 변경 (settings.json 동기화 및 /model 전송)",
+      "UUID": "com.vibecoding.claudecode.model",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-mode.png",
+      "Name": "바이브 설정 (모드/강도/Thinking)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-mode.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "settingType": "perm_mode",
+        "sendSlashCommand": true
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "권한 모드 순환(Shift+Tab), 추론 강도(Effort), 확장 사고(Alt+T) 토글",
+      "UUID": "com.vibecoding.claudecode.mode",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-cmd.png",
+      "Name": "슬래시 명령어 & 프롬프트",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-cmd.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "preset": "compact",
+        "commandText": "/compact",
+        "longPressCommand": "",
+        "label": "COMPACT",
+        "subLabel": "컨텍스트 압축",
+        "autoEnter": true
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "자주 쓰는 슬래시 명령어(/compact, /clear, /cost 등) 및 바이브 프롬프트 원터치 전송",
+      "UUID": "com.vibecoding.claudecode.command",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-util.png",
+      "Name": "바이브 유틸리티 (음성/스샷/훅)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-util.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "utilType": "voice"
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "음성 받아쓰기(Win+H / Mac 받아쓰기), 스크린샷 첨부(Alt+V / Ctrl+V), Claude 실행, 훅 설치",
+      "UUID": "com.vibecoding.claudecode.utility",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    }
+  ],
+  "SDKVersion": 1,
+  "Author": "VibeCoding",
+  "Name": "Claude Code 바이브코딩",
+  "Icon": "static/category.png",
+  "CodePathWin": "plugin/index.js",
+  "CodePathMac": "plugin/index.js",
+  "Description": "Claude Code 에이전트 실시간 구동 상태 모니터 및 바이브코딩 컨트롤러",
+  "Category": "Claude Code 바이브코딩",
+  "CategoryIcon": "static/category.png",
+  "Version": "1.0.0",
+  "URL": "https://docs.anthropic.com/en/docs/claude-code",
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    },
+    {
+      "Platform": "mac",
+      "MinimumVersion": "11"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "3.10.0"
+  },
+  "Nodejs": {
+    "Version": "20"
+  }
+}

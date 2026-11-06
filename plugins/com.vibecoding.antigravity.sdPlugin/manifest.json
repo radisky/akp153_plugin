@@ -1,0 +1,170 @@
+{
+  "Actions": [
+    {
+      "Icon": "static/icon-status.png",
+      "Name": "에이전트 구동 상태",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-status.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "panelMode": "overview",
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Antigravity 에이전트 실시간 구동 상태(대기/동작중/승인·질문대기/완료) 표시 및 앱·터미널 포커스",
+      "UUID": "com.vibecoding.antigravity.status",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-approve.png",
+      "Name": "응답 제어 (승인/자동승인/중단)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-approve.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "responseType": "approve",
+        "autoFocusTerminal": true,
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Antigravity Proceed 승인(Enter), 남은 작업 자동승인 완주, 즉시 중단(Esc / Ctrl+C)",
+      "UUID": "com.vibecoding.antigravity.approval",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-model.png",
+      "Name": "모델 변경 (Gemini 4 / 5.5)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-model.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "modelMode": "cycle",
+        "targetModel": "argon",
+        "sendSlashCommand": false,
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Gemini 4 Argon · Flash 3.8 · Sonnet 5.5 · Opus 5.5 · Auto 순환/지정 전환",
+      "UUID": "com.vibecoding.antigravity.model",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-mode.png",
+      "Name": "정책 & 추론 강도 (Policy/Thinking)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-mode.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "settingType": "exec_policy",
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "실행 정책(검토실행/샌드박스/자율진행), Thinking 강도(Low/Med/High), 샌드박스 ON/OFF",
+      "UUID": "com.vibecoding.antigravity.mode",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-cmd.png",
+      "Name": "슬래시 워크플로우 & 프롬프트",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-cmd.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "preset": "plan",
+        "commandText": "/plan ",
+        "longPressCommand": "/grill-me ",
+        "label": "",
+        "autoEnter": false,
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Antigravity 전용 /plan, /boost, /goal, /teamwork, /compact 및 바이브 프롬프트 전송",
+      "UUID": "com.vibecoding.antigravity.command",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-util.png",
+      "Name": "바이브 유틸리티 (음성/스샷/훅)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-util.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "utilType": "voice",
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "음성 입력(Win+H / Mac 받아쓰기), 스마트 스샷 첨부(Ctrl+V / Cmd+V), AGY 실행, hooks.json 설정",
+      "UUID": "com.vibecoding.antigravity.utility",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    }
+  ],
+  "SDKVersion": 1,
+  "Author": "VibeCoding",
+  "Name": "Antigravity 바이브코딩",
+  "Icon": "static/category.png",
+  "CodePathWin": "plugin/index.js",
+  "CodePathMac": "plugin/index.js",
+  "Description": "Google Antigravity 실시간 구동 상태 모니터 및 바이브코딩 컨트롤러",
+  "Category": "Antigravity 바이브코딩",
+  "CategoryIcon": "static/category.png",
+  "Version": "1.0.0",
+  "URL": "https://antigravity.google/docs",
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    },
+    {
+      "Platform": "mac",
+      "MinimumVersion": "11"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "3.10.0"
+  },
+  "Nodejs": {
+    "Version": "20"
+  }
+}

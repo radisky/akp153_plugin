@@ -1,0 +1,30 @@
+{
+  "Name": "Claude Code Vibe Coding",
+  "Description": "Real-time Claude Code agent status monitor & Vibe Coding deck",
+  "Category": "Claude Code Vibe Coding",
+  "com.vibecoding.claudecode.status": {
+    "Name": "Agent Status Monitor",
+    "Tooltip": "Displays live Claude Code status (Idle / Running / Waiting Input / Done)"
+  },
+  "com.vibecoding.claudecode.approval": {
+    "Name": "Prompt Response (Approve/Stop)",
+    "Tooltip": "Approve (Enter), Allow Session (2), or Interrupt (Esc / Ctrl+C)"
+  },
+  "com.vibecoding.claudecode.model": {
+    "Name": "Model Switcher (5.5 / Fable)",
+    "Tooltip": "Cycle or select Sonnet 5.5 / Opus 5.5 / Fable 5.1 / Haiku 5.5 / OpusPlan"
+  },
+  "com.vibecoding.claudecode.mode": {
+    "Name": "Vibe Mode & Effort",
+    "Tooltip": "Toggle Shift+Tab Mode, Effort level, or Extended Thinking"
+  },
+  "com.vibecoding.claudecode.command": {
+    "Name": "Slash Command & Prompt",
+    "Tooltip": "Send /compact, /clear, /cost, or custom vibe prompts"
+  },
+  "com.vibecoding.claudecode.utility": {
+    "Name": "Vibe Utility",
+    "Tooltip": "Voice Typing (Win+H), Paste Screenshot (Alt+V), Launch Claude, Setup Hooks"
+  },
+  "Localization": {}
+}

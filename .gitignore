@@ -1,0 +1,18 @@
+# Local runtime logs & backups
+*.log
+plugin_runtime.log
+*.bak
+*.bak_*
+
+# Firmware & vendor binaries (local workspace only, not part of plugin repo)
+/app/
+/firmware/
+/tools/
+flash_akp153_to_global.ps1
+verify_global_device.ps1
+test_plugin_ws.js
+
+# OS / Editor metadata
+.DS_Store
+Thumbs.db
+node_modules/

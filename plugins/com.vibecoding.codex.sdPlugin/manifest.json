@@ -1,0 +1,170 @@
+{
+  "Actions": [
+    {
+      "Icon": "static/icon-status.png",
+      "Name": "에이전트 구동 상태",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-status.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "panelMode": "overview",
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "OpenAI Codex 실시간 구동 상태(대기/동작중/승인·질문대기/완료) 표시 및 터미널·앱 포커스",
+      "UUID": "com.vibecoding.codex.status",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-approve.png",
+      "Name": "응답 제어 (승인/세션허용/중단)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-approve.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "responseType": "approve",
+        "autoFocusTerminal": true,
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Codex 승인(y / Enter), 세션 항상 허용(a / /permissions), 즉시 중단(Esc / Ctrl+C)",
+      "UUID": "com.vibecoding.codex.approval",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-model.png",
+      "Name": "모델 변경 (GPT-6.1 SOL / ASTRA)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-model.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "modelMode": "cycle",
+        "targetModel": "sol",
+        "sendSlashCommand": true,
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "GPT-6.1 Sol · GPT-6 Astra · GPT-6.1 Terra · GPT-6 Luna 순환/지정 변경 (config.toml 동기화 및 /model 전송)",
+      "UUID": "com.vibecoding.codex.model",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-mode.png",
+      "Name": "권한 & 추론 & 샌드박스 설정",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-mode.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "settingType": "perm_mode",
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad", "Information"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "승인 정책(요청승인/자동수정/완전자율), 추론 강도(Low~XHigh), 샌드박스(쓰기허용/읽기전용/풀액세스)",
+      "UUID": "com.vibecoding.codex.mode",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-cmd.png",
+      "Name": "슬래시 명령어 & 프롬프트",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-cmd.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "preset": "review",
+        "commandText": "/review",
+        "longPressCommand": "/diff",
+        "label": "",
+        "autoEnter": true,
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "Codex 전용 /review, /compact, /new, /diff, /ide 및 바이브 자동수정·커밋 프롬프트 전송",
+      "UUID": "com.vibecoding.codex.command",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    },
+    {
+      "Icon": "static/icon-util.png",
+      "Name": "바이브 유틸리티 (음성/스샷/훅)",
+      "DisableAutomaticStates": true,
+      "States": [
+        {
+          "Image": "static/icon-util.png",
+          "TitleAlignment": "center",
+          "FontSize": "9"
+        }
+      ],
+      "Settings": {
+        "utilType": "voice",
+        "displayStyle": "icon_label"
+      },
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "SupportedInMultiActions": true,
+      "Tooltip": "음성 입력(Win+H / Mac 받아쓰기), 스샷 첨부(Ctrl+V / Alt+V), Codex 실행, config.toml 훅 자동설치",
+      "UUID": "com.vibecoding.codex.utility",
+      "PropertyInspectorPath": "propertyInspector/index.html"
+    }
+  ],
+  "SDKVersion": 1,
+  "Author": "VibeCoding",
+  "Name": "OpenAI Codex 바이브코딩",
+  "Icon": "static/category.png",
+  "CodePathWin": "plugin/index.js",
+  "CodePathMac": "plugin/index.js",
+  "Description": "OpenAI Codex CLI 실시간 구동 상태 모니터 및 바이브코딩 컨트롤러",
+  "Category": "OpenAI Codex 바이브코딩",
+  "CategoryIcon": "static/category.png",
+  "Version": "1.0.0",
+  "URL": "https://openai.com/codex",
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    },
+    {
+      "Platform": "mac",
+      "MinimumVersion": "11"
+    }
+  ],
+  "Software": {
+    "MinimumVersion": "3.10.0"
+  },
+  "Nodejs": {
+    "Version": "20"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "Name": "OpenAI Codex 바이브코딩",
+  "Description": "OpenAI Codex 에이전트 실시간 구동 상태 모니터 및 바이브코딩 컨트롤러",
+  "Category": "OpenAI Codex 바이브코딩",
+  "com.vibecoding.codex.status": {
+    "Name": "에이전트 구동 상태",
+    "Tooltip": "OpenAI Codex 실시간 구동 상태(대기/동작중/승인·질문대기/완료) 표시 및 터미널 포커스"
+  },
+  "com.vibecoding.codex.approval": {
+    "Name": "응답 제어 (승인/세션허용/중단)",
+    "Tooltip": "Codex 승인(y/Enter), 세션 항상 허용(a), 즉시 중단(Esc / Ctrl+C)"
+  },
+  "com.vibecoding.codex.model": {
+    "Name": "모델 변경 (GPT-6.1 SOL / ASTRA)",
+    "Tooltip": "GPT-6.1 Sol · GPT-6 Astra · GPT-6.1 Terra · GPT-6 Luna 순환/지정 전환"
+  },
+  "com.vibecoding.codex.mode": {
+    "Name": "권한 & 추론 & 샌드박스 설정",
+    "Tooltip": "승인 정책(요청승인/자동수정/완전자율), 추론 강도(Low~XHigh), 샌드박스 모드 전환"
+  },
+  "com.vibecoding.codex.command": {
+    "Name": "슬래시 명령어 & 프롬프트",
+    "Tooltip": "/review, /compact, /new, /diff, /ide 및 바이브 프롬프트 원터치 전송"
+  },
+  "com.vibecoding.codex.utility": {
+    "Name": "바이브 유틸리티 (음성/스샷/훅)",
+    "Tooltip": "음성 받아쓰기(Win+H), 스샷 첨부(Ctrl+V), Codex 실행, 상태 훅 자동설치"
+  },
+  "Localization": {}
+}

@@ -1,0 +1,30 @@
+{
+  "Name": "OpenAI Codex Vibe Coding",
+  "Description": "Real-time OpenAI Codex status monitor & Vibe Coding deck",
+  "Category": "OpenAI Codex Vibe Coding",
+  "com.vibecoding.codex.status": {
+    "Name": "Agent Status Monitor",
+    "Tooltip": "Displays live OpenAI Codex status (Idle / Running / Waiting Approval / Done)"
+  },
+  "com.vibecoding.codex.approval": {
+    "Name": "Prompt Response (Approve/Allow/Stop)",
+    "Tooltip": "Approve (y / Enter), Allow Session (a), or Interrupt (Esc / Ctrl+C)"
+  },
+  "com.vibecoding.codex.model": {
+    "Name": "Model Switcher (GPT-6.1 / GPT-6)",
+    "Tooltip": "Cycle GPT-6.1 Sol / GPT-6 Astra / GPT-6.1 Terra / GPT-6 Luna"
+  },
+  "com.vibecoding.codex.mode": {
+    "Name": "Approval, Effort & Sandbox",
+    "Tooltip": "Cycle Approval Policy, Reasoning Effort (Low~XHigh), or Sandbox Mode"
+  },
+  "com.vibecoding.codex.command": {
+    "Name": "Slash Command & Prompt",
+    "Tooltip": "Send /review, /compact, /new, /diff, /ide, or custom vibe prompts"
+  },
+  "com.vibecoding.codex.utility": {
+    "Name": "Vibe Utility",
+    "Tooltip": "Voice Typing, Paste Screenshot, Launch Codex, Setup Hooks"
+  },
+  "Localization": {}
+}

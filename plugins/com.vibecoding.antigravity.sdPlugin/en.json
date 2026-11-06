@@ -1,0 +1,30 @@
+{
+  "Name": "Antigravity Vibe Coding",
+  "Description": "Real-time Google Antigravity status monitor & Vibe Coding deck",
+  "Category": "Antigravity Vibe Coding",
+  "com.vibecoding.antigravity.status": {
+    "Name": "Agent Status Monitor",
+    "Tooltip": "Displays live Antigravity status (Idle / Running / Waiting Approval / Done)"
+  },
+  "com.vibecoding.antigravity.approval": {
+    "Name": "Prompt Response (Proceed/Stop)",
+    "Tooltip": "Proceed (Enter), Auto-Proceed Remaining, or Interrupt (Esc / Ctrl+C)"
+  },
+  "com.vibecoding.antigravity.model": {
+    "Name": "Model Switcher (Gemini 4 / 5.5)",
+    "Tooltip": "Cycle Gemini 4 Argon / Flash 3.8 / Sonnet 5.5 / Opus 5.5 / Auto"
+  },
+  "com.vibecoding.antigravity.mode": {
+    "Name": "Policy & Thinking Level",
+    "Tooltip": "Cycle Execution Policy, Thinking Level (Low/Med/High), or Sandbox"
+  },
+  "com.vibecoding.antigravity.command": {
+    "Name": "Slash Workflow & Prompt",
+    "Tooltip": "Send /plan, /boost, /goal, /teamwork, /compact, or custom prompts"
+  },
+  "com.vibecoding.antigravity.utility": {
+    "Name": "Vibe Utility",
+    "Tooltip": "Voice Typing, Paste Screenshot, Launch Antigravity, Setup Hooks"
+  },
+  "Localization": {}
+}
