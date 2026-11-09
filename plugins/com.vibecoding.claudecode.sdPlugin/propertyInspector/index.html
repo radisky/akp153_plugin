@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Claude Code 바이브코딩 설정</title>
+  <title>Claude Code Vibe Coding Settings</title>
   <style>
     :root {
       --bg: #1e1e1e;
@@ -21,7 +21,7 @@
       padding: 12px 14px 20px;
       background: var(--bg);
       color: var(--text);
-      font-family: 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', -apple-system, 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 13px;
       line-height: 1.5;
     }
@@ -137,134 +137,134 @@
 
   <!-- 0. Universal Icon Display Mode -->
   <div class="section">
-    <div class="section-title">LCD 아이콘 표시 스타일</div>
+    <div class="section-title">LCD Icon Display Style</div>
     <div class="field">
       <select id="displayStyle">
-        <option value="icon_label">대형 벡터 아이콘 + 굵은 라벨 (기본 추천)</option>
-        <option value="icon_only">순수 대형 아이콘만 표시 (무각인 미니멀)</option>
+        <option value="icon_label">Large Vector Icon + Bold Label (Recommended)</option>
+        <option value="icon_only">Pure Large Icon Only (Minimal)</option>
       </select>
     </div>
   </div>
 
   <!-- 1. Action-Specific Settings -->
   <div class="section hidden" id="cfg-status">
-    <div class="section-title">에이전트 구동 상태 표시 설정</div>
+    <div class="section-title">Agent Live Status Settings</div>
     <div class="field">
-      <label for="panelMode">표시 패널 종류</label>
+      <label for="panelMode">Panel Mode</label>
       <select id="panelMode">
-        <option value="overview">메인 구동 상태 (대기 / 동작중 / 승인·입력대기 / 완료)</option>
-        <option value="activity">상세 진행 도구 &amp; 대기 항목 모니터</option>
-        <option value="metrics">세션 요약 (현재 모델 · 모드 · 추론강도 · Thinking)</option>
+        <option value="overview">Primary Status (Idle / Running / Waiting / Done)</option>
+        <option value="activity">Active Tool &amp; Prompt Monitor</option>
+        <option value="metrics">Session Summary (Model · Mode · Effort · Thinking)</option>
       </select>
     </div>
     <div class="field">
-      <label for="customLabel">대기 상태 보조 문구 (비워두면 기본값)</label>
-      <input type="text" id="customLabel" placeholder="클릭: 터미널 포커스" />
+      <label for="customLabel">Custom Idle Label (Optional)</label>
+      <input type="text" id="customLabel" placeholder="Click: Focus Session" />
     </div>
-    <div class="hint">• 짧게 누름: Claude 터미널 창으로 즉시 포커스<br>• 길게 누름(0.6초): 하드웨어에서 5가지 상태 미리보기 순환</div>
+    <div class="hint">• Short press: Focus active Claude session (Orca / IDE / Terminal)<br>• Long press (0.6s): Cycle through 5 live state previews on LCD</div>
   </div>
 
   <div class="section hidden" id="cfg-approval">
-    <div class="section-title">입력 대기 응답 키 설정</div>
+    <div class="section-title">Prompt Response Key Settings</div>
     <div class="field">
-      <label for="responseType">응답 동작</label>
+      <label for="responseType">Response Action</label>
       <select id="responseType">
-        <option value="approve">승인 / 확인 (Enter, 길게: y + Enter)</option>
-        <option value="approve_session">이번 세션 계속 허용 (숫자 2 전송)</option>
-        <option value="reject">거절 / 즉시 중단 (Esc, 길게: Ctrl+C)</option>
+        <option value="approve">Approve / Confirm (Enter, Long press: y + Enter)</option>
+        <option value="approve_session">Allow for Session (Send '2', Long press: Shift+Tab)</option>
+        <option value="reject">Reject / Interrupt (Esc, Long press: Ctrl+C)</option>
       </select>
     </div>
     <label class="check-row">
       <input type="checkbox" id="autoFocusTerminal" checked />
-      전송 전 Claude 터미널 자동 포커스
+      Auto-focus active session window (Orca / IDE / Terminal) before sending
     </label>
   </div>
 
   <div class="section hidden" id="cfg-model">
-    <div class="section-title">Claude 모델 변경 설정</div>
+    <div class="section-title">Claude Model Switcher</div>
     <div class="field">
-      <label for="modelMode">전환 방식</label>
+      <label for="modelMode">Switch Mode</label>
       <select id="modelMode">
-        <option value="cycle">순환 변경 (Sonnet 5.5 → Opus 5.5 → Fable 5.1 → Haiku 5.5 → OpusPlan)</option>
-        <option value="fixed">특정 모델로 즉시 지정</option>
+        <option value="cycle">Cycle Models (Sonnet 5.5 → Opus 5.5 → Fable 5.1 → Haiku 5.5 → OpusPlan)</option>
+        <option value="fixed">Fixed Target Model</option>
       </select>
     </div>
     <div class="field" id="targetModelWrap">
-      <label for="targetModel">지정 모델 (최신 Claude 5 세대)</label>
+      <label for="targetModel">Target Model (Claude 5 Generation)</label>
       <select id="targetModel">
-        <option value="sonnet">Claude Sonnet 5.5 (claude-sonnet-5-5 · 데일리 밸런스)</option>
-        <option value="opus">Claude Opus 5.5 (claude-opus-5-5 · 플래그십 복합설계)</option>
-        <option value="fable">Claude Fable 5.1 (claude-fable-5-1 · 최상위 심층 추론)</option>
-        <option value="haiku">Claude Haiku 5.5 (claude-haiku-5-5 · 초고속 경량)</option>
-        <option value="opusplan">Opus Plan 하이브리드 (opusplan · 설계Opus + 구현Sonnet)</option>
+        <option value="sonnet">Claude Sonnet 5.5 (claude-sonnet-5-5 · Daily Balance)</option>
+        <option value="opus">Claude Opus 5.5 (claude-opus-5-5 · Flagship Architecture)</option>
+        <option value="fable">Claude Fable 5.1 (claude-fable-5-1 · Deep Reasoning)</option>
+        <option value="haiku">Claude Haiku 5.5 (claude-haiku-5-5 · Ultra-Fast)</option>
+        <option value="opusplan">Opus Plan Hybrid (opusplan · Plan Opus + Code Sonnet)</option>
       </select>
     </div>
     <label class="check-row">
       <input type="checkbox" id="modelSendSlash" checked />
-      settings.json 저장과 함께 활성 창에 <code>/model</code> 전송
+      Sync settings.json and send <code>/model</code> to active IDE (Orca, etc.) / Terminal session
     </label>
   </div>
 
   <div class="section hidden" id="cfg-mode">
-    <div class="section-title">바이브코딩 모드 &amp; 추론 설정</div>
+    <div class="section-title">Vibe Mode &amp; Reasoning Settings</div>
     <div class="field">
-      <label for="settingType">제어할 설정 항목</label>
+      <label for="settingType">Control Target</label>
       <select id="settingType">
-        <option value="perm_mode">권한/플랜 모드 순환 (Shift+Tab: 일반/자동수정/플랜)</option>
-        <option value="effort">추론 강도 순환 (Effort: Low / Medium / High / Max)</option>
-        <option value="thinking">확장 사고 토글 (Win: Alt+T / Mac: Option+T)</option>
+        <option value="perm_mode">Cycle Permission / Plan Mode (Shift+Tab: Default / Auto-Edit / Plan)</option>
+        <option value="effort">Cycle Reasoning Effort (Low / Medium / High / Max)</option>
+        <option value="thinking">Toggle Extended Thinking (Win: Alt+T / Mac: Option+T)</option>
       </select>
     </div>
     <label class="check-row">
-      <input type="checkbox" id="modeSendSlash" />
-      추론 강도 변경 시 <code>/effort</code> 슬래시 명령도 함께 전송
+      <input type="checkbox" id="modeSendSlash" checked />
+      Send <code>/effort</code> slash command to active session (Orca / IDE / Terminal)
     </label>
   </div>
 
   <div class="section hidden" id="cfg-command">
-    <div class="section-title">슬래시 명령어 &amp; 바이브 프롬프트</div>
+    <div class="section-title">Slash Commands &amp; Vibe Prompts</div>
     <div class="field">
-      <label for="preset">추천 프리셋</label>
+      <label for="preset">Preset</label>
       <select id="preset">
-        <option value="compact">/compact (컨텍스트 압축 · 길게: /context)</option>
-        <option value="clear">/clear (세션 초기화 · 길게: /doctor)</option>
-        <option value="cost">/cost (비용 확인 · 길게: /resume 이전 세션)</option>
-        <option value="vibe_fix">바이브 프롬프트: 빌드 &amp; 테스트 오류 자동 수정</option>
-        <option value="vibe_commit">바이브 프롬프트: 변경사항 요약 &amp; Git 커밋</option>
-        <option value="custom">직접 입력 (커스텀 명령어 / 프롬프트)</option>
+        <option value="compact">/compact (Compact context · Long press: /context)</option>
+        <option value="clear">/clear (Clear session · Long press: /doctor)</option>
+        <option value="cost">/cost (Token usage &amp; cost · Long press: /resume)</option>
+        <option value="vibe_fix">Vibe Prompt: Build, test &amp; fix errors automatically</option>
+        <option value="vibe_commit">Vibe Prompt: Summarize git diff &amp; commit</option>
+        <option value="custom">Custom Command / Prompt</option>
       </select>
     </div>
     <div class="field">
-      <label for="label">키 메인 라벨</label>
+      <label for="label">Key Main Label</label>
       <input type="text" id="label" placeholder="/compact" />
     </div>
     <div class="field">
-      <label for="subLabel">키 보조 설명</label>
-      <input type="text" id="subLabel" placeholder="컨텍스트 압축" />
+      <label for="subLabel">Key Sub-Label</label>
+      <input type="text" id="subLabel" placeholder="Compact Context" />
     </div>
     <div class="field">
-      <label for="commandText">짧게 누를 때 전송할 텍스트</label>
+      <label for="commandText">Short-Press Text</label>
       <textarea id="commandText" placeholder="/compact"></textarea>
     </div>
     <div class="field">
-      <label for="longPressCommand">길게 누를 때 전송할 텍스트 (선택)</label>
+      <label for="longPressCommand">Long-Press Text (Optional)</label>
       <input type="text" id="longPressCommand" placeholder="/resume" />
     </div>
     <label class="check-row">
       <input type="checkbox" id="autoEnter" checked />
-      텍스트 입력 후 자동으로 Enter 실행
+      Press Enter automatically after sending text
     </label>
   </div>
 
   <div class="section hidden" id="cfg-utility">
-    <div class="section-title">바이브코딩 유틸리티</div>
+    <div class="section-title">Vibe Coding Utility</div>
     <div class="field">
-      <label for="utilType">기능 선택</label>
+      <label for="utilType">Utility Function</label>
       <select id="utilType">
-        <option value="voice">음성 바이브코딩 받아쓰기 (Win+H / macOS 받아쓰기)</option>
-        <option value="screenshot">스크린샷 이미지 첨부 (Win: Alt+V / Mac: Ctrl+V, 길게: 영역캡처)</option>
-        <option value="launch">Claude 터미널 포커스 (길게: 새 터미널에서 Claude 실행)</option>
-        <option value="install_hooks">상태 훅 자동설치 및 LCD 데모 실행</option>
+        <option value="voice">Voice Dictation (Win+H / macOS Dictation)</option>
+        <option value="screenshot">Paste Screenshot (Win: Alt+V / Mac: Ctrl+V, Long press: Snip)</option>
+        <option value="launch">Focus Session Window (Long press: Launch new Claude session)</option>
+        <option value="install_hooks">Auto-Install Status Hooks &amp; Run LCD Demo</option>
       </select>
     </div>
   </div>
@@ -272,21 +272,21 @@
   <!-- 2. Live LCD State Simulator & Hook Status -->
   <div class="section">
     <div class="section-title">
-      <span>실시간 구동 상태 테스트 (LCD 즉시 반영)</span>
-      <span id="hookBadge" class="badge">훅 연동 확인중</span>
+      <span>Live LCD State Test</span>
+      <span id="hookBadge" class="badge">Checking Hooks...</span>
     </div>
     <div class="btn-grid">
-      <button type="button" data-sim="IDLE">✻ 대기중</button>
-      <button type="button" data-sim="RUNNING">◐ 동작중</button>
-      <button type="button" data-sim="WAITING_PERMISSION">⚠ 승인대기</button>
-      <button type="button" data-sim="WAITING_INPUT">? 입력대기</button>
-      <button type="button" data-sim="COMPLETED">✓ 작업완료</button>
-      <button type="button" id="btnDemo">▶ 연속데모</button>
+      <button type="button" data-sim="IDLE">✻ Idle</button>
+      <button type="button" data-sim="RUNNING">◐ Running</button>
+      <button type="button" data-sim="WAITING_PERMISSION">⚠ Permit</button>
+      <button type="button" data-sim="WAITING_INPUT">? Input</button>
+      <button type="button" data-sim="COMPLETED">✓ Done</button>
+      <button type="button" id="btnDemo">▶ Demo</button>
     </div>
     <button type="button" class="primary" id="btnInstallHooks">
-      ~/.claude/settings.json 실시간 상태 훅 자동 설정/복구
+      Configure / Repair ~/.claude/settings.json Hooks
     </button>
-    <div class="hint" id="liveSummary">연결 대기 중...</div>
+    <div class="hint" id="liveSummary">Waiting for connection...</div>
   </div>
 
   <script>
@@ -297,11 +297,11 @@
     let currentSettings = {};
 
     const PRESET_DEFAULTS = {
-      compact:     { label: '/compact', subLabel: '컨텍스트 압축', commandText: '/compact', longPressCommand: '/context' },
-      clear:       { label: '/clear',   subLabel: '새 세션 초기화', commandText: '/clear',   longPressCommand: '/doctor' },
-      cost:        { label: '/cost',    subLabel: '토큰 · 비용 확인', commandText: '/cost',    longPressCommand: '/resume' },
-      vibe_fix:    { label: '빌드 & 수정', subLabel: '테스트 오류 해결', commandText: '빌드와 테스트를 실행하고 에러나 실패한 항목이 있으면 원인을 찾아 수정해줘', longPressCommand: '' },
-      vibe_commit: { label: '요약 & 커밋', subLabel: 'Git 변경사항 커밋', commandText: 'git status와 diff를 확인해서 변경사항을 깔끔하게 요약하고 적절한 커밋 메시지로 커밋해줘', longPressCommand: '/diff' }
+      compact:     { label: '/compact', subLabel: 'Compact Context', commandText: '/compact', longPressCommand: '/context' },
+      clear:       { label: '/clear',   subLabel: 'Reset Session',   commandText: '/clear',   longPressCommand: '/doctor' },
+      cost:        { label: '/cost',    subLabel: 'Cost & Resume',   commandText: '/cost',    longPressCommand: '/resume' },
+      vibe_fix:    { label: 'FIX',      subLabel: 'Build & Fix',     commandText: 'Run the build and tests, and if any errors or failures occur, find the root cause and fix them.', longPressCommand: '' },
+      vibe_commit: { label: 'COMMIT',   subLabel: 'Summarize & Commit', commandText: 'Check git status and diff, summarize the changes cleanly, and create a git commit with an appropriate message.', longPressCommand: '/diff' }
     };
 
     function showRelevantSection() {
@@ -333,7 +333,7 @@
         document.getElementById('modelMode').value === 'fixed' ? 'block' : 'none';
 
       if (s.settingType) document.getElementById('settingType').value = s.settingType;
-      document.getElementById('modeSendSlash').checked = s.sendSlashCommand === true;
+      document.getElementById('modeSendSlash').checked = s.sendSlashCommand !== false;
 
       if (s.preset) document.getElementById('preset').value = s.preset;
       document.getElementById('label').value = s.label || '';
@@ -393,7 +393,6 @@
           payload
         }));
       }
-      // Also support direct localhost fallback
       if (payload.cmd === 'simulate' || payload.cmd === 'demo') {
         fetch('http://127.0.0.1:17530/simulate', {
           method: 'POST',
@@ -407,14 +406,14 @@
       if (!st) return;
       const badge = document.getElementById('hookBadge');
       if (st.hooksInstalled) {
-        badge.textContent = '✓ Claude 훅 연결됨';
+        badge.textContent = '✓ Claude Hooks Active';
         badge.className = 'badge';
       } else {
-        badge.textContent = '⚠ 훅 미설정';
+        badge.textContent = '⚠ Hooks Not Set';
         badge.className = 'badge warn';
       }
       document.getElementById('liveSummary').textContent =
-        `현재 상태: ${st.state} | 모델: ${st.modelDisplay || st.model.toUpperCase()} (${st.modelId || ''}) | 강도: ${st.effortLevel.toUpperCase()} | 활성 타일: ${st.connectedContexts}개`;
+        `State: ${st.state} | Model: ${st.modelDisplay || st.model.toUpperCase()} (${st.modelId || ''}) | Effort: ${st.effortLevel.toUpperCase()} | Tiles: ${st.connectedContexts}`;
     }
 
     document.getElementById('preset').addEventListener('change', (e) => {

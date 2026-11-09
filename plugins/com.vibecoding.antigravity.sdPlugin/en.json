@@ -1,30 +1,30 @@
 {
   "Name": "Antigravity Vibe Coding",
-  "Description": "Real-time Google Antigravity status monitor & Vibe Coding deck",
+  "Description": "Real-time Google Antigravity agent status monitor & Vibe Coding controller",
   "Category": "Antigravity Vibe Coding",
   "com.vibecoding.antigravity.status": {
-    "Name": "Agent Status Monitor",
-    "Tooltip": "Displays live Antigravity status (Idle / Running / Waiting Approval / Done)"
+    "Name": "Agent Live Status",
+    "Tooltip": "Displays live Antigravity status (Idle / Running / Waiting Approval / Done) and focuses the active IDE or terminal session"
   },
   "com.vibecoding.antigravity.approval": {
-    "Name": "Prompt Response (Proceed/Stop)",
-    "Tooltip": "Proceed (Enter), Auto-Proceed Remaining, or Interrupt (Esc / Ctrl+C)"
+    "Name": "Prompt Response (Approve / Auto / Stop)",
+    "Tooltip": "Approve / Proceed (Enter), Auto-Proceed Remaining Steps, or Stop Immediately (Esc / Ctrl+C)"
   },
   "com.vibecoding.antigravity.model": {
     "Name": "Model Switcher (Gemini 4 / 5.5)",
-    "Tooltip": "Cycle Gemini 4 Argon / Flash 3.8 / Sonnet 5.5 / Opus 5.5 / Auto"
+    "Tooltip": "Cycle or lock Gemini 4 Argon, Flash 3.8, Sonnet 5.5, Opus 5.5, or Auto"
   },
   "com.vibecoding.antigravity.mode": {
     "Name": "Policy & Thinking Level",
-    "Tooltip": "Cycle Execution Policy, Thinking Level (Low/Med/High), or Sandbox"
+    "Tooltip": "Cycle Execution Policy (Review / Sandbox / Auto), Thinking Level (Low / Med / High), or Sandbox toggle"
   },
   "com.vibecoding.antigravity.command": {
     "Name": "Slash Workflow & Prompt",
-    "Tooltip": "Send /plan, /boost, /goal, /teamwork, /compact, or custom prompts"
+    "Tooltip": "Send /plan, /boost, /goal, /teamwork, /compact, or custom vibe prompts to the active session"
   },
   "com.vibecoding.antigravity.utility": {
-    "Name": "Vibe Utility",
-    "Tooltip": "Voice Typing, Paste Screenshot, Launch Antigravity, Setup Hooks"
+    "Name": "Vibe Utility (Voice / Paste / Hooks)",
+    "Tooltip": "Voice Dictation (Win+H / macOS Dictation), Paste Screenshot (Ctrl+V / Cmd+V), Focus Antigravity, or Auto-Install Hooks"
   },
   "Localization": {}
 }

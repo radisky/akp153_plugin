@@ -1,30 +1,30 @@
 {
-  "Name": "Claude Code 바이브코딩",
-  "Description": "Claude Code 에이전트 실시간 구동 상태 모니터 및 바이브코딩 컨트롤러",
-  "Category": "Claude Code 바이브코딩",
+  "Name": "Claude Code Vibe Coding",
+  "Description": "Real-time Claude Code agent status monitor & Vibe Coding controller",
+  "Category": "Claude Code Vibe Coding",
   "com.vibecoding.claudecode.status": {
-    "Name": "에이전트 구동 상태",
-    "Tooltip": "Claude Code 실시간 구동 상태(대기/동작중/입력대기/완료) 표시 및 터미널 포커스"
+    "Name": "Agent Live Status",
+    "Tooltip": "Displays live Claude Code status (Idle / Running / Waiting Input / Done) and focuses the active IDE or terminal session"
   },
   "com.vibecoding.claudecode.approval": {
-    "Name": "입력 대기 응답 (승인/중단)",
-    "Tooltip": "Claude Code 권한 승인(Enter), 세션 허용(2), 중단(Esc / Ctrl+C)"
+    "Name": "Prompt Response (Approve / Stop)",
+    "Tooltip": "Approve permission (Enter), Allow for Session (2), or Stop / Interrupt (Esc / Ctrl+C)"
   },
   "com.vibecoding.claudecode.model": {
-    "Name": "모델 변경 (5.5 / Fable 5.1)",
-    "Tooltip": "Claude 5.5(Sonnet/Opus/Haiku) · Fable 5.1 · OpusPlan 순환/지정 변경"
+    "Name": "Model Switcher (5.5 / Fable 5.1)",
+    "Tooltip": "Cycle or lock Claude 5.5 (Sonnet / Opus / Haiku), Fable 5.1, or OpusPlan"
   },
   "com.vibecoding.claudecode.mode": {
-    "Name": "바이브 설정 (모드/강도/Thinking)",
-    "Tooltip": "권한 모드 순환(Shift+Tab), 추론 강도(Effort), 확장 사고(Alt+T) 토글"
+    "Name": "Vibe Mode (Perm / Effort / Thinking)",
+    "Tooltip": "Cycle Permission Mode (Shift+Tab), Reasoning Effort (Low~Max), or Extended Thinking (Alt+T)"
   },
   "com.vibecoding.claudecode.command": {
-    "Name": "슬래시 명령어 & 프롬프트",
-    "Tooltip": "자주 쓰는 슬래시 명령어(/compact, /clear, /cost 등) 및 바이브 프롬프트 전송"
+    "Name": "Slash Command & Prompt",
+    "Tooltip": "Send slash commands (/compact, /clear, /cost, etc.) or custom vibe prompts to the active session"
   },
   "com.vibecoding.claudecode.utility": {
-    "Name": "바이브 유틸리티 (음성/스샷/훅)",
-    "Tooltip": "음성 받아쓰기(Win+H), 스크린샷 붙여넣기(Alt+V), Claude 실행, 상태 훅 자동설치"
+    "Name": "Vibe Utility (Voice / Paste / Hooks)",
+    "Tooltip": "Voice Dictation (Win+H / macOS Dictation), Paste Screenshot (Alt+V / Ctrl+V), Focus Session, or Auto-Install Hooks"
   },
   "Localization": {}
 }

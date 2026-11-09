@@ -1,74 +1,77 @@
 # AJAZZ AKP153 / AKP153E Vibe Coding Stream Dock Plugins
 
-**AJAZZ AKP153 / AKP153E** (및 Mirabox 호환 Stream Dock)용 **AI 바이브코딩 실시간 구동 상태 모니터 & 원터치 컨트롤러 플러그인 3종 세트**입니다.  
-외부 npm 패키지 의존성 없이 순수 Node.js 20 내장 모듈(`http`, `crypto`, RFC 6455 `MiniWebSocket`)만으로 동작하며, **Windows 10/11** 및 **macOS 11+ (Apple Silicon / Intel)** 크로스플랫폼을 모두 지원합니다.
+A suite of 3 **live AI Vibe Coding status monitors & one-touch hardware controller plugins** for **AJAZZ AKP153 / AKP153E** (and Mirabox-compatible Stream Dock devices).  
+Built with zero external npm dependencies using pure Node.js 20 built-ins (`http`, `crypto`, and a custom RFC 6455 `MiniWebSocket`), with full cross-platform support for **Windows 10/11** and **macOS 11+ (Apple Silicon & Intel)**.
 
 ---
 
-## 포함 플러그인 3종 (동시 구동 지원 · 포트 분리)
+## Included Plugins (Concurrent Execution · Isolated Loopback Ports)
 
-| 에이전트 | 플러그인 번들 | 로컬 HTTP 포트 | 기본 테마 | 지원 최신 모델 |
+| Agent | Plugin Bundle | Local HTTP Port | Theme | Supported Models |
 | :--- | :--- | :---: | :--- | :--- |
-| **Claude Code** | `plugins/com.vibecoding.claudecode.sdPlugin` | `127.0.0.1:17530` | 코랄 오렌지 스파크 (`#FF8B66`) | `Sonnet 5.5` · `Opus 5.5` · `Fable 5.1` · `Haiku 5.5` · `OpusPlan` |
-| **Google Antigravity** | `plugins/com.vibecoding.antigravity.sdPlugin` | `127.0.0.1:17531` | 사파이어 블루 오빗 (`#60A5FA`) | `Gemini 4 Argon` · `Gemini 3.8 Flash` · `Sonnet 5.5` · `Opus 5.5` · `Auto` |
-| **OpenAI Codex** | `plugins/com.vibecoding.codex.sdPlugin` | `127.0.0.1:17532` | 에메랄드 헥사곤 (`#34D399`) | `GPT-6.1 Sol` · `GPT-6 Astra` · `GPT-6.1 Terra` · `GPT-6 Luna` |
+| **Claude Code** | `plugins/com.vibecoding.claudecode.sdPlugin` | `127.0.0.1:17530` | Coral Orange Spark (`#FF8B66`) | `Sonnet 5.5` · `Opus 5.5` · `Fable 5.1` · `Haiku 5.5` · `OpusPlan` |
+| **Google Antigravity** | `plugins/com.vibecoding.antigravity.sdPlugin` | `127.0.0.1:17531` | Sapphire Blue Orbit (`#60A5FA`) | `Gemini 4 Argon` · `Gemini 3.8 Flash` · `Sonnet 5.5` · `Opus 5.5` · `Auto` |
+| **OpenAI Codex** | `plugins/com.vibecoding.codex.sdPlugin` | `127.0.0.1:17532` | Emerald Hexagon (`#34D399`) | `GPT-6.1 Sol` · `GPT-6 Astra` · `GPT-6.1 Terra` · `GPT-6 Luna` |
 
 ---
 
-## 주요 기능
+## Key Features
 
-- **실시간 에이전트 구동 상태 대시보드 (`IDLE` / `RUNNING` / `WAITING_PERMISSION` / `WAITING_INPUT` / `COMPLETED`)**
-  - **Claude Code**: `~/.claude/settings.json` Hooks 자동 구성 및 실시간 상태 수신
-  - **Google Antigravity**: `~/.gemini/config/hooks.json` + `~/.gemini/antigravity*/brain/*/transcript.jsonl` 이중 실시간 감시
-  - **OpenAI Codex**: `~/.codex/hooks.json` + `~/.codex/config.toml` (`notify`) + `~/.codex/sessions/**/*.jsonl` 삼중 감시 (기존 TOML 섹션 보존)
-- **고시인성 순수 벡터 SVG 아이콘 타일 (`144x144`)**
-  - 두꺼운 기하학 벡터 아이콘 + 외곽선 처리된 고대비 단일 라벨 기본 제공
-  - Property Inspector에서 **무각인 아이콘 전용 미니멀 모드 (`icon_only`)** 즉시 전환 가능
-- **1페이지 18슬롯 완결형 레이아웃 (`5x3` 물리 버튼 + 우측 `3`칸 LCD 상태 스트립)**
-  - 승인(`Enter` / `y`), 세션 허용(`2` / `a` / 자동승인), 즉시 중단(`Esc` / 길게 `Ctrl+C`)
-  - 최신 모델 순환/지정 변경, 추론 강도(`Effort` / `Thinking`) 토글, 실행 정책/샌드박스 순환
-  - 에이전트별 핵심 슬래시 워크플로우(`/compact`, `/clear`, `/plan`, `/boost`, `/teamwork`, `/review`, `/new` 등) 및 길게 누르기(Long-press `>=550ms`) 보조 명령 지원
-  - 음성 받아쓰기(`Win+H` / macOS 받아쓰기), 스마트 스크린샷 붙여넣기(`Ctrl+V` / `Alt+V` / `Cmd+V`)
-- **크로스플랫폼 스마트 포커스 브리지 (Windows + macOS)**
-  - **Windows**: 상주형 PowerShell Win32 `SendInput` 브리지로 활성 터미널/IDE/데스크톱 앱 자동 탐색 및 포커스
-  - **macOS**: JXA(`osascript -l JavaScript`) + 클립보드 복원형 UTF-8 `pbcopy`/`pbpaste`로 한글 프롬프트 무손실 입력
+- **Live Agent Status Dashboard (`IDLE` / `RUNNING` / `WAITING_PERMISSION` / `WAITING_INPUT` / `COMPLETED`)**
+  - **Claude Code**: Auto-installs and syncs `~/.claude/settings.json` hooks for real-time state updates.
+  - **Google Antigravity**: Dual live monitoring via `~/.gemini/config/hooks.json` and `~/.gemini/antigravity*/brain/*/transcript.jsonl`.
+  - **OpenAI Codex**: Triple live monitoring via `~/.codex/hooks.json`, `~/.codex/config.toml` (`notify`), and `~/.codex/sessions/**/*.jsonl` while preserving existing TOML sections.
+- **High-Legibility Pure Vector SVG Tiles (`144x144`)**
+  - Crisp geometric vector icons paired with a high-contrast outlined bottom label.
+  - Instant toggle to **Minimal Icon Only (`icon_only`)** mode in the Property Inspector.
+- **Complete 1-Page 18-Slot Layout (`5x3` Physical Keys + `3`-Tile Side LCD Strip)**
+  - Instant Approve (`Enter` / `y`), Allow Session (`2` / `a` / Auto-Proceed), and Emergency Stop (`Esc` / long-press `Ctrl+C`).
+  - Cycle or lock the latest AI models, toggle reasoning effort (`Effort` / `Thinking`), and switch execution/sandbox policies.
+  - Dedicated slash workflows (`/compact`, `/clear`, `/plan`, `/boost`, `/teamwork`, `/review`, `/new`, etc.) with secondary long-press (`>=550ms`) actions.
+  - Voice dictation (`Win+H` / macOS Dictation) and smart screenshot paste (`Ctrl+V` / `Alt+V` / `Cmd+V`).
+- **Orca & Multi-IDE / Terminal Active Session Smart Bridge (Windows + macOS)**
+  - **Native Orca (`stablyai/orca`) Integration**: Tracks the hook process tree (`PPID`), worktree path (`cwd`), and `ORCA_*` environment variables. Uses `orca terminal focus` and `orca terminal send` when the `orca` CLI is installed to inject commands directly into the active split pane, falling back automatically to OS window focus + clipboard paste.
+  - **Multi-IDE & Terminal Priority**: Routes shortcuts, approvals, and slash commands (`/model`, `/effort`, `/compact`, etc.) directly into the currently active IDE (**Orca**, **Cursor**, **VS Code**, **Antigravity**, **Codex**, **Windsurf**, **Zed**, **cmux**, **JetBrains**, etc.) or terminal session without stealing focus to an unrelated background terminal.
+  - **IME-Safe Input**: Uses clipboard paste for single-character approval keys (`y`, `a`, `n`) and slash commands so non-English IME states never garble input.
+- **Strict Localhost (`127.0.0.1`) Loopback Binding & Security**
+  - All HTTP status/hook servers (`17530`, `17531`, `17532`) and WebSocket clients bind exclusively to `127.0.0.1` and reject non-loopback sockets, DNS rebinding (`Host` header validation), and cross-site browser requests (`Origin` / `Sec-Fetch-Site: cross-site`).
 
 ---
 
-## 설치 방법
+## Installation
 
 ### Windows (AJAZZ Stream Dock Global)
-PowerShell에서 아래 스크립트를 실행하면 3개 플러그인 복사, 18슬롯 전용 프로필 3종 생성 및 `DataCache.db` 자동 등록, Stream Dock 재시작까지 한 번에 수행됩니다.
+Run the PowerShell installer to deploy all 3 plugins, generate the 3 dedicated 18-slot profiles, register them in `DataCache.db`, and restart Stream Dock:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install_and_launch.ps1 -ActiveProfile antigravity
 ```
-- `-ActiveProfile` 옵션: `claude`, `antigravity`, `codex` 중 초기 활성화할 프로필 선택 가능 (설치 후 Stream Dock 상단 프로필 목록에서 3종 모두 자유롭게 전환 가능)
+- `-ActiveProfile`: Choose `claude`, `antigravity`, or `codex` as the initial active profile (all 3 profiles remain available in the Stream Dock profile selector).
 
 ### macOS (macOS 11+ Apple Silicon & Intel)
-터미널에서 아래 스크립트를 실행하면 3개 `.sdPlugin` 번들과 각 에이전트용 실시간 상태 훅이 자동 설치됩니다.
+Run the macOS installer in Terminal to install all 3 `.sdPlugin` bundles and configure real-time hooks for each agent:
 
 ```bash
 chmod +x ./install_macos.sh
 ./install_macos.sh
 ```
-> **macOS 권한 안내**: 키 입력 및 창 전환 제어를 위해 **시스템 설정 → 개인정보 보호 및 보안 → 손쉬운 사용(Accessibility)** 에서 `Stream Dock` (및 `osascript`) 권한을 허용해 주세요.
+> **macOS Accessibility Permission**: Grant permission to `Stream Dock` (and `osascript`) under **System Settings → Privacy & Security → Accessibility** so keystrokes and window focus switching work seamlessly.
 
 ---
 
-## 디렉터리 구조
+## Directory Structure
 
 ```text
 ├── plugins/
-│   ├── com.vibecoding.claudecode.sdPlugin/   # Claude Code 플러그인 (포트 17530)
-│   ├── com.vibecoding.antigravity.sdPlugin/  # Google Antigravity 플러그인 (포트 17531)
-│   └── com.vibecoding.codex.sdPlugin/        # OpenAI Codex 플러그인 (포트 17532)
-├── deploy_vibe_plugin.js                     # Windows 플러그인 & 18슬롯 프로필 3종 생성기
-├── install_and_launch.ps1                    # Windows 원클릭 설치 · DB 등록 · 재시작 스크립트
-├── install_macos.sh                          # macOS 원클릭 통합 설치 스크립트
-├── generate_icons.ps1                        # Claude Code 정적 아이콘 생성 스크립트
-└── generate_agy_codex_icons.ps1              # Antigravity & Codex 정적 아이콘 생성 스크립트
+│   ├── com.vibecoding.claudecode.sdPlugin/   # Claude Code plugin (127.0.0.1:17530)
+│   ├── com.vibecoding.antigravity.sdPlugin/  # Google Antigravity plugin (127.0.0.1:17531)
+│   └── com.vibecoding.codex.sdPlugin/        # OpenAI Codex plugin (127.0.0.1:17532)
+├── deploy_vibe_plugin.js                     # Windows plugin & 18-slot profile generator
+├── install_and_launch.ps1                    # Windows one-click installer, DB registration & launcher
+├── install_macos.sh                          # macOS one-click installer
+├── generate_icons.ps1                        # Claude Code static icon generator
+└── generate_agy_codex_icons.ps1              # Antigravity & Codex static icon generator
 ```
 
-## 라이선스
+## License
 MIT License

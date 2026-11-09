@@ -1,11 +1,15 @@
 'use strict';
 
-const http = require('http');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawn, execFile } = require('child_process');
+const {
+  LOOPBACK_HOST,
+  parseLoopbackPort,
+  createLocalhostHttpServer,
+  MiniWebSocket,
+  SessionBridge
+} = require('./session_bridge');
 
 // ============================================================================
 // 1. Platform Constants, Logging & Paths (OpenAI Codex - Win + macOS)
@@ -23,7 +27,7 @@ const CODEX_SESSIONS_DIR = path.join(CODEX_DIR, 'sessions');
 const BUNDLED_HOOK_SCRIPT = path.join(__dirname, 'streamdock_codex_notify.js');
 const WIN_BRIDGE_SCRIPT = path.join(__dirname, 'win_bridge.ps1');
 const LOG_FILE = path.join(__dirname, 'plugin_runtime.log');
-const HTTP_PORT = Number(process.env.CODEX_SD_HTTP_PORT || 17532);
+const HTTP_PORT = parseLoopbackPort(process.env.CODEX_SD_HTTP_PORT, 17532);
 
 function log(msg) {
   try {
@@ -38,398 +42,16 @@ try {
 } catch (_) {}
 
 // ============================================================================
-// 2. Pure Node.js RFC 6455 WebSocket Client (Zero npm dependencies)
+// 2. Orca / Multi-IDE / Terminal Active Session Bridge
 // ============================================================================
-class MiniWebSocket {
-  constructor(url) {
-    const parsed = new URL(url);
-    this.host = parsed.hostname || '127.0.0.1';
-    this.port = Number(parsed.port);
-    this.pathname = (parsed.pathname || '/') + (parsed.search || '');
-    this.socket = null;
-    this.rxBuf = Buffer.alloc(0);
-    this.fragOpcode = 0;
-    this.fragChunks = [];
-    this.readyState = 0;
-    this.onopen = null;
-    this.onmessage = null;
-    this.onclose = null;
-    this.onerror = null;
-    this._connect();
-  }
-
-  _connect() {
-    const key = crypto.randomBytes(16).toString('base64');
-    const req = http.request({
-      hostname: this.host,
-      port: this.port,
-      path: this.pathname,
-      method: 'GET',
-      headers: {
-        Connection: 'Upgrade',
-        Upgrade: 'websocket',
-        'Sec-WebSocket-Version': '13',
-        'Sec-WebSocket-Key': key
-      }
-    });
-
-    req.on('upgrade', (res, socket, head) => {
-      this.socket = socket;
-      this.socket.setNoDelay(true);
-      this.readyState = 1;
-      if (head && head.length > 0) this.rxBuf = Buffer.concat([this.rxBuf, head]);
-      socket.on('data', (chunk) => {
-        this.rxBuf = Buffer.concat([this.rxBuf, chunk]);
-        this._drainFrames();
-      });
-      socket.on('close', () => {
-        this.readyState = 3;
-        if (this.onclose) this.onclose();
-      });
-      socket.on('error', (err) => {
-        if (this.onerror) this.onerror(err);
-      });
-      if (this.onopen) this.onopen();
-      if (this.rxBuf.length > 0) this._drainFrames();
-    });
-
-    req.on('error', (err) => {
-      this.readyState = 3;
-      if (this.onerror) this.onerror(err);
-    });
-    req.end();
-  }
-
-  _drainFrames() {
-    while (this.rxBuf.length >= 2) {
-      const b0 = this.rxBuf[0];
-      const b1 = this.rxBuf[1];
-      const fin = (b0 & 0x80) !== 0;
-      const opcode = b0 & 0x0f;
-      const masked = (b1 & 0x80) !== 0;
-      let payloadLen = b1 & 0x7f;
-      let offset = 2;
-
-      if (payloadLen === 126) {
-        if (this.rxBuf.length < 4) return;
-        payloadLen = this.rxBuf.readUInt16BE(2);
-        offset = 4;
-      } else if (payloadLen === 127) {
-        if (this.rxBuf.length < 10) return;
-        payloadLen = Number(this.rxBuf.readBigUInt64BE(2));
-        offset = 10;
-      }
-
-      const maskLen = masked ? 4 : 0;
-      if (this.rxBuf.length < offset + maskLen + payloadLen) return;
-
-      let payload = this.rxBuf.subarray(offset + maskLen, offset + maskLen + payloadLen);
-      if (masked) {
-        const mask = this.rxBuf.subarray(offset, offset + 4);
-        const unmasked = Buffer.allocUnsafe(payloadLen);
-        for (let i = 0; i < payloadLen; i++) unmasked[i] = payload[i] ^ mask[i & 3];
-        payload = unmasked;
-      } else {
-        payload = Buffer.from(payload);
-      }
-
-      this.rxBuf = this.rxBuf.subarray(offset + maskLen + payloadLen);
-
-      if (opcode === 0x08) {
-        this.close();
-        return;
-      } else if (opcode === 0x09) {
-        this._sendFrame(0x0a, payload);
-      } else if (opcode === 0x01 || opcode === 0x02) {
-        if (fin) {
-          if (opcode === 0x01 && this.onmessage) this.onmessage({ data: payload.toString('utf8') });
-        } else {
-          this.fragOpcode = opcode;
-          this.fragChunks = [payload];
-        }
-      } else if (opcode === 0x00) {
-        this.fragChunks.push(payload);
-        if (fin) {
-          const full = Buffer.concat(this.fragChunks);
-          const origOp = this.fragOpcode;
-          this.fragChunks = [];
-          this.fragOpcode = 0;
-          if (origOp === 0x01 && this.onmessage) this.onmessage({ data: full.toString('utf8') });
-        }
-      }
-    }
-  }
-
-  _sendFrame(opcode, payloadBuf) {
-    if (this.readyState !== 1 || !this.socket) return;
-    const len = payloadBuf.length;
-    let header;
-    if (len < 126) {
-      header = Buffer.from([0x80 | (opcode & 0x0f), 0x80 | len]);
-    } else if (len <= 65535) {
-      header = Buffer.allocUnsafe(4);
-      header[0] = 0x80 | (opcode & 0x0f);
-      header[1] = 0x80 | 126;
-      header.writeUInt16BE(len, 2);
-    } else {
-      header = Buffer.allocUnsafe(10);
-      header[0] = 0x80 | (opcode & 0x0f);
-      header[1] = 0x80 | 127;
-      header.writeBigUInt64BE(BigInt(len), 2);
-    }
-    const mask = crypto.randomBytes(4);
-    const maskedPayload = Buffer.allocUnsafe(len);
-    for (let i = 0; i < len; i++) maskedPayload[i] = payloadBuf[i] ^ mask[i & 3];
-    this.socket.write(Buffer.concat([header, mask, maskedPayload]));
-  }
-
-  send(data) {
-    const buf = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8');
-    this._sendFrame(0x01, buf);
-  }
-
-  close() {
-    if (this.readyState === 3) return;
-    this.readyState = 3;
-    try { if (this.socket) this.socket.end(); } catch (_) {}
-  }
-}
-
-// ============================================================================
-// 3. Cross-Platform Input & Window Focus Bridge (Prioritizing Codex CLI / App)
-// ============================================================================
-const MAC_JXA_SCRIPT = `
-function run(argv) {
-  const req = JSON.parse(argv[0]);
-  const se = Application("System Events");
-  const termNames = ["iTerm2", "iTerm", "Terminal", "Warp", "Ghostty", "wezterm-gui", "WezTerm", "Alacritty", "kitty"];
-  const ideNames = ["Codex", "Cursor", "Code", "Visual Studio Code", "Windsurf", "Antigravity", "Zed"];
-
-  function findCodexProc() {
-    const procs = se.applicationProcesses.whose({ backgroundOnly: false })();
-    let codexTerm = null, codexGui = null, anyTerm = null, anyIde = null;
-    for (let i = 0; i < procs.length; i++) {
-      const p = procs[i];
-      let pName = "";
-      try { pName = p.name(); } catch (e) { continue; }
-      const isTerm = termNames.indexOf(pName) >= 0;
-      const isIde = ideNames.indexOf(pName) >= 0;
-      if (!isTerm && !isIde) continue;
-
-      let hasCodex = pName.toLowerCase().indexOf("codex") >= 0;
-      try {
-        const wins = p.windows();
-        for (let w = 0; w < wins.length; w++) {
-          const wt = String(wins[w].name() || "").toLowerCase();
-          if (wt.indexOf("codex") >= 0) { hasCodex = true; break; }
-        }
-      } catch (e) {}
-
-      if (isTerm && hasCodex && !codexTerm) codexTerm = { proc: p, isGui: false };
-      else if (isIde && hasCodex && !codexGui) codexGui = { proc: p, isGui: true };
-      else if (isTerm && !anyTerm) anyTerm = { proc: p, isGui: false };
-      else if (isIde && !anyIde) anyIde = { proc: p, isGui: true };
-    }
-    return codexTerm || codexGui || anyTerm || anyIde;
-  }
-
-  if (req.cmd === "focus") {
-    const found = findCodexProc();
-    if (found) {
-      found.proc.frontmost = true;
-      return JSON.stringify({ ok: true, foundCoding: true, isGui: found.isGui, target: found.proc.name() });
-    }
-    if (req.launchIfMissing) {
-      const term = Application("Terminal");
-      term.activate();
-      return JSON.stringify({ ok: true, launched: true, target: "Terminal" });
-    }
-    return JSON.stringify({ ok: false, foundCoding: false });
-  }
-
-  if (req.cmd === "launch_codex") {
-    const sqEsc = String.fromCharCode(39, 92, 39, 39);
-    const cwdEsc = String(req.cwd || "").split("'").join(sqEsc);
-    const cdPart = cwdEsc ? ("cd '" + cwdEsc + "' && ") : "";
-    const shCmd = cdPart + "(command -v codex >/dev/null 2>&1 && codex || echo 'OpenAI Codex CLI Ready')";
-    const term = Application("Terminal");
-    term.activate();
-    term.doScript(shCmd);
-    return JSON.stringify({ ok: true, launched: "Terminal" });
-  }
-
-  if (req.cmd === "key") {
-    const combo = String(req.combo || "").toLowerCase();
-    const isGlobal = (combo === "voice" || combo === "screen_snip");
-    const found = findCodexProc();
-    if (req.focus && found && combo !== "screen_snip") {
-      found.proc.frontmost = true;
-      delay(0.04);
-    }
-    if (!isGlobal && req.requireCoding && !found) {
-      return JSON.stringify({ ok: false, skipped: "no_coding_window" });
-    }
-
-    switch (combo) {
-      case "enter":     se.keyCode(36); break;
-      case "esc":       se.keyCode(53); break;
-      case "y":         se.keystroke("y"); break;
-      case "a":         se.keystroke("a"); break;
-      case "2":         se.keystroke("2"); break;
-      case "ctrl+c":    se.keyCode(8, { using: "control down" }); break;
-      case "shift+tab": se.keyCode(48, { using: "shift down" }); break;
-      case "image_paste":
-        if (found && found.isGui) se.keyCode(9, { using: "command down" });
-        else se.keyCode(9, { using: "control down" });
-        break;
-      case "screen_snip":
-        se.keyCode(21, { using: ["command down", "control down", "shift down"] });
-        break;
-      case "cmd+v":
-        se.keyCode(9, { using: "command down" });
-        break;
-      case "cmd+v+enter":
-        se.keyCode(9, { using: "command down" });
-        delay(0.05);
-        se.keyCode(36);
-        break;
-      case "voice": {
-        let triggered = false;
-        const menus = ["Edit", "편집"];
-        for (let m = 0; m < menus.length && !triggered; m++) {
-          try {
-            const fg = se.applicationProcesses.whose({ frontmost: true })()[0];
-            const items = fg.menuBars[0].menuBarItems.byName(menus[m]).menus[0].menuItems();
-            for (let i = 0; i < items.length; i++) {
-              const nm = String(items[i].name() || "");
-              if (nm.indexOf("Dictation") >= 0 || nm.indexOf("받아쓰기") >= 0) {
-                items[i].click();
-                triggered = true;
-                break;
-              }
-            }
-          } catch (e) {}
-        }
-        if (!triggered) { se.keyCode(63); delay(0.07); se.keyCode(63); }
-        break;
-      }
-      default: se.keyCode(36); break;
-    }
-    return JSON.stringify({ ok: true, combo: combo });
-  }
-  return JSON.stringify({ ok: false, error: "unknown_cmd" });
-}
-`;
-
-class PlatformBridge {
-  constructor() {
-    this.winProc = null;
-    this.startingWin = false;
-    if (IS_WIN && fs.existsSync(WIN_BRIDGE_SCRIPT)) this._spawnWinBridge();
-  }
-
-  _spawnWinBridge() {
-    if (this.startingWin || this.winProc) return;
-    this.startingWin = true;
-    try {
-      const child = spawn(
-        'powershell.exe',
-        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', WIN_BRIDGE_SCRIPT],
-        { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }
-      );
-      child.stdin.setDefaultEncoding('utf8');
-      child.stdout.on('data', (d) => { const s = d.toString('utf8').trim(); if (s) log(`[WinBridge] ${s}`); });
-      child.stderr.on('data', (d) => { const s = d.toString('utf8').trim(); if (s) log(`[WinBridge:ERR] ${s}`); });
-      child.on('exit', () => { this.winProc = null; this.startingWin = false; });
-      this.winProc = child;
-      this.startingWin = false;
-    } catch (_) {
-      this.startingWin = false;
-    }
-  }
-
-  _sendWin(cmdObj) {
-    if (!this.winProc) this._spawnWinBridge();
-    if (this.winProc && this.winProc.stdin && !this.winProc.stdin.destroyed) {
-      try { this.winProc.stdin.write(JSON.stringify(cmdObj) + '\n', 'utf8'); } catch (_) {}
-    }
-  }
-
-  _runMacJxa(reqObj, cb) {
-    execFile(
-      '/usr/bin/osascript',
-      ['-l', 'JavaScript', '-e', MAC_JXA_SCRIPT, JSON.stringify(reqObj)],
-      { timeout: 3500 },
-      (err, stdout) => {
-        if (err) { if (cb) cb(null); return; }
-        const out = String(stdout || '').trim();
-        if (cb) { try { cb(JSON.parse(out)); } catch (_) { cb(null); } }
-      }
-    );
-  }
-
-  _macClipboardWrite(text, done) {
-    try {
-      const pb = spawn('/usr/bin/pbcopy', [], {
-        env: { ...process.env, LANG: 'en_US.UTF-8', LC_CTYPE: 'UTF-8' },
-        stdio: ['pipe', 'ignore', 'ignore']
-      });
-      pb.stdin.write(String(text), 'utf8');
-      pb.stdin.end();
-      pb.on('close', () => done && done());
-      pb.on('error', () => done && done());
-    } catch (_) { if (done) done(); }
-  }
-
-  focusApp(launchIfMissing = false, cwd = '') {
-    if (IS_WIN) this._sendWin({ cmd: 'focus', launchIfMissing, cwd });
-    else if (IS_MAC) this._runMacJxa({ cmd: 'focus', launchIfMissing, cwd });
-  }
-
-  sendLogicalKey(actionKey, focus = true, requireCoding = true) {
-    if (IS_WIN) {
-      const winMap = { screen_snip: 'win+shift+s', voice: 'win+h' };
-      this._sendWin({ cmd: 'key', combo: winMap[actionKey] || actionKey, focus, requireCoding });
-    } else if (IS_MAC) {
-      this._runMacJxa({ cmd: 'key', combo: actionKey, focus, requireCoding });
-    }
-  }
-
-  sendText(text, enter = true, focus = true, requireCoding = true) {
-    if (IS_WIN) {
-      this._sendWin({ cmd: 'text', text, enter, focus, requireCoding });
-      return;
-    }
-    if (IS_MAC) {
-      this._runMacJxa({ cmd: 'focus', launchIfMissing: false }, (res) => {
-        if (requireCoding && (!res || !res.foundCoding)) return;
-        execFile(
-          '/usr/bin/pbpaste',
-          [],
-          { env: { ...process.env, LANG: 'en_US.UTF-8', LC_CTYPE: 'UTF-8' }, timeout: 1000 },
-          (pbErr, prevClip) => {
-            const hadPrev = !pbErr && typeof prevClip === 'string';
-            this._macClipboardWrite(text, () => {
-              this._runMacJxa(
-                { cmd: 'key', combo: enter ? 'cmd+v+enter' : 'cmd+v', focus, requireCoding: false },
-                () => { if (hadPrev) setTimeout(() => this._macClipboardWrite(prevClip), 220); }
-              );
-            });
-          }
-        );
-      });
-    }
-  }
-
-  launchCodex(cwd = '') {
-    let safeCwd = '';
-    try { if (cwd && fs.existsSync(cwd) && fs.statSync(cwd).isDirectory()) safeCwd = cwd; } catch (_) {}
-    if (IS_WIN) this._sendWin({ cmd: 'launch_codex', cwd: safeCwd });
-    else if (IS_MAC) this._runMacJxa({ cmd: 'launch_codex', cwd: safeCwd });
-  }
-}
-
-const bridge = new PlatformBridge();
+const bridge = new SessionBridge({
+  agentKind: 'codex',
+  agentBinaries: ['codex'],
+  agentKeywords: ['codex'],
+  pureGuiApps: ['codex'],
+  winBridgeScript: WIN_BRIDGE_SCRIPT,
+  log
+});
 
 // ============================================================================
 // 4. Codex Config (~/.codex/config.toml), Hooks (~/.codex/hooks.json) & Session Watcher
@@ -444,29 +66,29 @@ const MODEL_META = {
 
 const EFFORT_ORDER = ['low', 'medium', 'high', 'xhigh'];
 const EFFORT_META = {
-  low:    { label: 'LOW',   kor: '추론 LOW',   bars: 1, color: '#CBD5E1', border: '#94A3B8' },
-  medium: { label: 'MED',   kor: '추론 MED',   bars: 2, color: '#60A5FA', border: '#3B82F6' },
-  high:   { label: 'HIGH',  kor: '추론 HIGH',  bars: 3, color: '#34D399', border: '#10B981' },
-  xhigh:  { label: 'XHIGH', kor: '추론 XHIGH', bars: 4, color: '#FBBF24', border: '#F59E0B' }
+  low:    { label: 'LOW',   kor: 'EFF LOW',   bars: 1, color: '#CBD5E1', border: '#94A3B8' },
+  medium: { label: 'MED',   kor: 'EFF MED',   bars: 2, color: '#60A5FA', border: '#3B82F6' },
+  high:   { label: 'HIGH',  kor: 'EFF HIGH',  bars: 3, color: '#34D399', border: '#10B981' },
+  xhigh:  { label: 'XHIGH', kor: 'EFF XHIGH', bars: 4, color: '#FBBF24', border: '#F59E0B' }
 };
 
 const APPROVAL_ORDER = ['on-request', 'on-failure', 'never'];
 const APPROVAL_META = {
-  'on-request': { label: '요청승인', color: '#60A5FA', border: '#3B82F6' },
-  'on-failure': { label: '자동수정', color: '#34D399', border: '#10B981' },
-  'never':      { label: '완전자율', color: '#FBBF24', border: '#F59E0B' }
+  'on-request': { label: 'ON-REQ',    color: '#60A5FA', border: '#3B82F6' },
+  'on-failure': { label: 'AUTO-EDIT', color: '#34D399', border: '#10B981' },
+  'never':      { label: 'FULL-AUTO', color: '#FBBF24', border: '#F59E0B' }
 };
 
 const SANDBOX_ORDER = ['workspace-write', 'read-only', 'danger-full-access'];
 const SANDBOX_META = {
-  'workspace-write':    { label: '쓰기허용', badge: 'RW',   color: '#34D399', border: '#10B981' },
-  'read-only':          { label: '읽기전용', badge: 'RO',   color: '#60A5FA', border: '#3B82F6' },
-  'danger-full-access': { label: '풀액세스', badge: 'FULL', color: '#F87171', border: '#EF4444' }
+  'workspace-write':    { label: 'WRITE', badge: 'RW',   color: '#34D399', border: '#10B981' },
+  'read-only':          { label: 'READ',  badge: 'RO',   color: '#60A5FA', border: '#3B82F6' },
+  'danger-full-access': { label: 'FULL',  badge: 'FULL', color: '#F87171', border: '#EF4444' }
 };
 
 const agent = {
   state: 'IDLE',
-  currentTool: '대기',
+  currentTool: 'IDLE',
   rawToolName: '',
   toolCount: 0,
   turnStartedAt: 0,
@@ -665,12 +287,12 @@ let sessionBooted = false;
 
 function mapCodexToolLabel(toolName) {
   const t = String(toolName || '').toLowerCase();
-  if (t.includes('shell') || t.includes('exec') || t.includes('bash') || t.includes('command')) return '셸실행';
-  if (t.includes('patch') || t.includes('edit') || t.includes('write')) return '패치적용';
-  if (t.includes('read') || t.includes('view')) return '파일읽기';
-  if (t.includes('web') || t.includes('search')) return '웹검색';
-  if (t.includes('review')) return '코드리뷰';
-  return toolName || '실행중';
+  if (t.includes('shell') || t.includes('exec') || t.includes('bash') || t.includes('command')) return 'Shell';
+  if (t.includes('patch') || t.includes('edit') || t.includes('write')) return 'Patch';
+  if (t.includes('read') || t.includes('view')) return 'Read';
+  if (t.includes('web') || t.includes('search')) return 'Search';
+  if (t.includes('review')) return 'Review';
+  return toolName || 'Running';
 }
 
 function findNewestCodexJsonl(dir, depth = 0) {
@@ -718,11 +340,17 @@ function pollActiveCodexSession() {
     const lines = buf.toString('utf8').trim().split('\n').filter(Boolean);
     if (!lines.length) return;
     const item = JSON.parse(lines[lines.length - 1]);
+    const sessionCwd = item.cwd || (item.payload && item.payload.cwd) || '';
+    if (sessionCwd) {
+      agent.cwdFull = String(sessionCwd);
+      agent.cwdName = path.basename(agent.cwdFull) || 'workspace';
+      bridge.setCwd(agent.cwdFull);
+    }
     const t = String(item.type || item.event || '').toLowerCase();
 
     if (t.includes('approval') || t.includes('permission')) {
       agent.state = 'WAITING_PERMISSION';
-      agent.currentTool = '승인대기';
+      agent.currentTool = 'Permit';
       renderAllContexts();
       broadcastStateToPI();
     } else if (t.includes('function_call') || t.includes('tool_call') || t.includes('command_execution')) {
@@ -740,7 +368,7 @@ function pollActiveCodexSession() {
       }
       agent.turnStartedAt = 0;
       agent.state = 'COMPLETED';
-      agent.currentTool = '완료';
+      agent.currentTool = 'Done';
       renderAllContexts();
       broadcastStateToPI();
     }
@@ -754,6 +382,7 @@ setInterval(pollActiveCodexSession, 1300);
 // ============================================================================
 function handleHookEvent(payload) {
   if (!payload || typeof payload !== 'object') return;
+  bridge.updateFromHook(payload);
   const evt = String(payload.hook_event_name || payload.type || payload.event || '').trim();
 
   if (payload.cwd) {
@@ -771,21 +400,21 @@ function handleHookEvent(payload) {
     }
     agent.turnStartedAt = 0;
     agent.state = 'COMPLETED';
-    agent.currentTool = '완료';
+    agent.currentTool = 'Done';
   } else if (evt === 'approval-requested' || evt === 'PermissionRequest') {
     agent.state = 'WAITING_PERMISSION';
-    agent.currentTool = '승인대기';
+    agent.currentTool = 'Permit';
   } else if (evt === 'SessionStart') {
     agent.state = 'IDLE';
     agent.turnStartedAt = 0;
     agent.toolCount = 0;
-    agent.currentTool = '대기';
+    agent.currentTool = 'IDLE';
   } else if (evt === 'UserPromptSubmit') {
     agent.state = 'RUNNING';
     agent.turnStartedAt = Date.now();
     agent.toolCount = 0;
     agent.rawToolName = 'Think';
-    agent.currentTool = '추론중';
+    agent.currentTool = 'Thinking';
   } else if (evt === 'PostToolUse' || evt === 'PreToolUse') {
     agent.state = 'RUNNING';
     if (!agent.turnStartedAt) agent.turnStartedAt = Date.now();
@@ -805,27 +434,27 @@ function applySimulatedState(targetState) {
     agent.state = 'IDLE';
     agent.turnStartedAt = 0;
     agent.rawToolName = '';
-    agent.currentTool = '대기';
+    agent.currentTool = 'IDLE';
   } else if (s === 'RUNNING') {
     agent.state = 'RUNNING';
     agent.turnStartedAt = Date.now() - 11000;
     agent.toolCount = Math.max(3, agent.toolCount);
     agent.rawToolName = 'apply_patch';
-    agent.currentTool = '패치적용';
+    agent.currentTool = 'Patch';
   } else if (s === 'WAITING_PERMISSION') {
     agent.state = 'WAITING_PERMISSION';
     agent.rawToolName = 'shell';
-    agent.currentTool = '승인대기';
+    agent.currentTool = 'Permit';
   } else if (s === 'WAITING_INPUT') {
     agent.state = 'WAITING_INPUT';
     agent.rawToolName = 'question';
-    agent.currentTool = '입력대기';
+    agent.currentTool = 'Input';
   } else if (s === 'COMPLETED') {
     agent.state = 'COMPLETED';
     agent.lastDurationSec = 14;
     agent.turnStartedAt = 0;
     agent.toolCount = Math.max(5, agent.toolCount);
-    agent.currentTool = '완료';
+    agent.currentTool = 'Done';
   }
   renderAllContexts();
   broadcastStateToPI();
@@ -1120,7 +749,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
   if (mode === 'activity') {
     let bg = '#0B0B0C', border = '#52525B', col = '#94A3B8';
     let icon = VEC.terminalPrompt('#94A3B8');
-    let label = '대기중', labelColor = '#E2E8F0', badge = 'CDX';
+    let label = 'IDLE', labelColor = '#E2E8F0', badge = 'CDX';
 
     if (agent.state === 'RUNNING') {
       bg = '#05291A'; border = '#34D399'; col = '#34D399';
@@ -1128,18 +757,18 @@ function renderStatusSvg(settings = {}, flashed = false) {
       if (tn.includes('patch') || tn.includes('edit') || tn.includes('write')) icon = VEC.codeEdit('#34D399');
       else if (tn.includes('review')) icon = VEC.reviewShieldLens('#34D399');
       else icon = VEC.terminalPrompt('#34D399');
-      label = agent.currentTool || '실행중';
+      label = agent.currentTool || 'Running';
       labelColor = '#FFFFFF';
       badge = `${agent.toolCount}`;
     } else if (agent.state === 'WAITING_PERMISSION') {
       bg = pulseOn ? '#3B1D02' : '#1C0E02'; border = pulseOn ? '#FDE047' : '#F59E0B'; col = '#FDE047';
-      icon = VEC.warningTriangle('#FACC15'); label = '승인대기'; labelColor = '#FEF08A'; badge = 'Y/A';
+      icon = VEC.warningTriangle('#FACC15'); label = 'PERMIT'; labelColor = '#FEF08A'; badge = 'Y/A';
     } else if (agent.state === 'WAITING_INPUT') {
       bg = pulseOn ? '#3B1219' : '#1C080C'; border = pulseOn ? '#FB923C' : '#F43F5E'; col = '#FB923C';
-      icon = VEC.questionBubble('#FB923C'); label = '입력대기'; labelColor = '#FEF08A'; badge = '?';
+      icon = VEC.questionBubble('#FB923C'); label = 'INPUT'; labelColor = '#FEF08A'; badge = '?';
     } else if (agent.state === 'COMPLETED') {
       bg = '#05291A'; border = '#10B981'; col = '#34D399';
-      icon = VEC.checkCircle('#34D399'); label = `${agent.toolCount}회 완료`; labelColor = '#A7F3D0';
+      icon = VEC.checkCircle('#34D399'); label = `${agent.toolCount} DONE`; labelColor = '#A7F3D0';
       badge = agent.lastDurationSec ? `${agent.lastDurationSec}s` : '✓';
     }
 
@@ -1163,7 +792,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
 
   let bg = '#0B0B0C', border = '#10B981', glow = '#10B981';
   let icon = VEC.codexHex('#34D399');
-  let label = '대기', labelColor = '#FFFFFF', badge = '';
+  let label = 'IDLE', labelColor = '#FFFFFF', badge = '';
 
   if (agent.state === 'RUNNING') {
     bg = '#05291A'; border = '#34D399'; glow = '#34D399';
@@ -1172,13 +801,13 @@ function renderStatusSvg(settings = {}, flashed = false) {
   } else if (agent.state === 'WAITING_PERMISSION') {
     bg = pulseOn ? '#422006' : '#1F1003'; border = pulseOn ? '#FDE047' : '#F59E0B'; glow = '#F59E0B';
     icon = VEC.warningTriangle(pulseOn ? '#FDE047' : '#F59E0B');
-    label = '승인대기'; labelColor = '#FEF08A';
+    label = 'PERMIT'; labelColor = '#FEF08A';
   } else if (agent.state === 'WAITING_INPUT') {
     bg = pulseOn ? '#431407' : '#1F0B05'; border = pulseOn ? '#FDBA74' : '#FB923C'; glow = '#FB923C';
-    icon = VEC.questionBubble('#FB923C'); label = '입력대기'; labelColor = '#FEF08A';
+    icon = VEC.questionBubble('#FB923C'); label = 'INPUT'; labelColor = '#FEF08A';
   } else if (agent.state === 'COMPLETED') {
     bg = '#05291A'; border = '#10B981'; glow = '#10B981';
-    icon = VEC.checkCircle('#34D399'); label = '완료'; labelColor = '#6EE7B7';
+    icon = VEC.checkCircle('#34D399'); label = 'DONE'; labelColor = '#6EE7B7';
     badge = agent.lastDurationSec ? `${agent.lastDurationSec}s` : '';
   }
 
@@ -1203,7 +832,7 @@ function renderApprovalSvg(settings = {}, flashed = false) {
       bg: waitingPerm && pulseOn ? '#06322D' : '#0B0B0C',
       border: flashed ? '#FFFFFF' : col, borderWidth: waitingPerm ? 6 : 4.5,
       glowColor: col, iconSvg: VEC.doubleCheck(col),
-      label: '세션허용', labelColor: waitingPerm ? '#FEF08A' : '#FFFFFF',
+      label: 'SESSION', labelColor: waitingPerm ? '#FEF08A' : '#FFFFFF',
       badge: 'A', badgeColor: col, iconOnly
     });
   }
@@ -1214,7 +843,7 @@ function renderApprovalSvg(settings = {}, flashed = false) {
       bg: activeRun ? '#2E0913' : '#0B0B0C',
       border: flashed ? '#FFFFFF' : col, borderWidth: activeRun ? 5.5 : 4.5,
       glowColor: col, iconSvg: VEC.stopCross(col),
-      label: '중단', labelColor: '#FFFFFF', badge: 'ESC', badgeColor: '#FDA4AF', iconOnly
+      label: 'STOP', labelColor: '#FFFFFF', badge: 'ESC', badgeColor: '#FDA4AF', iconOnly
     });
   }
 
@@ -1223,7 +852,7 @@ function renderApprovalSvg(settings = {}, flashed = false) {
     bg: waitingAny && pulseOn ? '#063321' : '#0B0B0C',
     border: flashed ? '#FFFFFF' : col, borderWidth: waitingAny ? 6 : 4.5,
     glowColor: col, iconSvg: VEC.bigCheck(col),
-    label: '승인', labelColor: waitingAny ? '#FEF08A' : '#FFFFFF',
+    label: 'APPROVE', labelColor: waitingAny ? '#FEF08A' : '#FFFFFF',
     badge: 'Y/⏎', badgeColor: col, iconOnly
   });
 }
@@ -1283,29 +912,29 @@ function renderModeSvg(settings = {}, flashed = false) {
 
 const CMD_PRESETS = {
   review: {
-    shortLabel: '코드리뷰', border: '#10B981',
+    shortLabel: 'REVIEW', border: '#10B981',
     cmd: '/review', longCmd: '/diff', defaultAutoEnter: true,
     iconFn: () => VEC.reviewShieldLens('#34D399')
   },
   compact: {
-    shortLabel: '압축', border: '#06B6D4',
+    shortLabel: 'COMPACT', border: '#06B6D4',
     cmd: '/compact', longCmd: '/status', defaultAutoEnter: true,
     iconFn: () => VEC.compress('#22D3EE')
   },
   clear: {
-    shortLabel: '새세션', border: '#A855F7',
+    shortLabel: 'NEW', border: '#A855F7',
     cmd: '/new', longCmd: '/init', defaultAutoEnter: true,
     iconFn: () => VEC.newSessionPlus('#C084FC')
   },
   ide_fix: {
-    shortLabel: 'IDE·수정', border: '#0284C7',
-    cmd: '빌드와 테스트를 실행하고 실패하거나 오류가 나는 부분을 찾아 수정해줘',
+    shortLabel: 'IDE·FIX', border: '#0284C7',
+    cmd: 'Run the build and tests, and if any failures or errors occur, find the root cause and fix them.',
     longCmd: '/ide', defaultAutoEnter: true,
     iconFn: () => VEC.wrenchFix('#38BDF8')
   },
   vibe_commit: {
-    shortLabel: '커밋', border: '#10B981',
-    cmd: 'git status와 diff를 확인해서 변경사항을 깔끔하게 요약하고 적절한 커밋 메시지로 커밋해줘',
+    shortLabel: 'COMMIT', border: '#10B981',
+    cmd: 'Check git status and diff, summarize the changes cleanly, and create a git commit with an appropriate message.',
     longCmd: '/hooks', defaultAutoEnter: true,
     iconFn: () => VEC.gitGraph('#34D399')
   }
@@ -1315,7 +944,7 @@ function renderCommandSvg(settings = {}, flashed = false) {
   const presetKey = settings.preset || 'review';
   const iconOnly = settings.displayStyle === 'icon_only';
   const preset = CMD_PRESETS[presetKey] || {
-    shortLabel: settings.label || '명령', border: '#10B981',
+    shortLabel: settings.label || 'CMD', border: '#10B981',
     iconFn: () => VEC.terminalPrompt('#34D399')
   };
   const label = settings.label ? settings.label : preset.shortLabel;
@@ -1334,27 +963,27 @@ function renderUtilitySvg(settings = {}, flashed = false) {
     return svgIconTile({
       bg: '#0B0B0C', border: flashed ? '#FFFFFF' : '#06B6D4', borderWidth: 4.5,
       glowColor: '#06B6D4', iconSvg: VEC.screenshotFrame('#22D3EE'),
-      label: '스샷', labelColor: '#FFFFFF', badge: IS_MAC ? '⌘V' : 'Ctrl+V', badgeColor: '#67E8F9', iconOnly
+      label: 'PASTE', labelColor: '#FFFFFF', badge: IS_MAC ? '⌘V' : 'Ctrl+V', badgeColor: '#67E8F9', iconOnly
     });
   }
   if (uType === 'launch') {
     return svgIconTile({
       bg: '#0B0B0C', border: flashed ? '#FFFFFF' : '#10B981', borderWidth: 4.5,
       glowColor: '#10B981', iconSvg: VEC.codexHex('#34D399'),
-      label: 'Codex열기', labelColor: '#FFFFFF', iconOnly
+      label: 'OPEN CDX', labelColor: '#FFFFFF', iconOnly
     });
   }
   if (uType === 'install_hooks') {
     const col = agent.hooksInstalled ? '#34D399' : '#FBBF24';
     return svgIconTile({
       bg: '#0B0B0C', border: flashed ? '#FFFFFF' : col, borderWidth: 4.5,
-      glowColor: col, iconSvg: VEC.linkNodes(col), label: '훅점검', labelColor: '#FFFFFF', iconOnly
+      glowColor: col, iconSvg: VEC.linkNodes(col), label: 'HOOKS', labelColor: '#FFFFFF', iconOnly
     });
   }
   return svgIconTile({
     bg: '#0B0B0C', border: flashed ? '#FFFFFF' : '#EC4899', borderWidth: 4.5,
     glowColor: '#EC4899', iconSvg: VEC.mic('#F472B6'),
-    label: '음성', labelColor: '#FFFFFF', badge: IS_MAC ? 'Fn' : 'Win+H', badgeColor: '#F9A8D4', iconOnly
+    label: 'VOICE', labelColor: '#FFFFFF', badge: IS_MAC ? 'Fn' : 'Win+H', badgeColor: '#F9A8D4', iconOnly
   });
 }
 
@@ -1422,6 +1051,7 @@ function getPublicState() {
     effort: agent.effort,
     approvalPolicy: agent.approvalPolicy,
     sandboxMode: agent.sandboxMode,
+    sessionHost: bridge.session.hostApp || '',
     hooksInstalled: agent.hooksInstalled,
     connectedContexts: contexts.size
   };
@@ -1560,7 +1190,7 @@ function handleActionTrigger(ctx, isLongPress) {
         if (isLongPress) bridge.sendLogicalKey('screen_snip', false, false);
         else bridge.sendLogicalKey('image_paste', true, true);
       } else if (uType === 'launch') {
-        if (isLongPress) bridge.launchCodex(agent.cwdFull);
+        if (isLongPress) bridge.launchAgent(agent.cwdFull);
         else bridge.focusApp(true, agent.cwdFull);
       } else if (uType === 'install_hooks') {
         installOrRepairCodexHooks();
@@ -1585,50 +1215,46 @@ setInterval(() => {
 // ============================================================================
 // 8. Local HTTP Server (127.0.0.1:17532) & Stream Dock WebSocket Bootstrap
 // ============================================================================
-const srv = http.createServer((req, res) => {
-  const origin = String(req.headers.origin || '');
-  if (origin && origin !== 'null' && !origin.startsWith('file://')) {
-    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: false, error: 'forbidden_origin' }));
-    return;
-  }
+createLocalhostHttpServer({
+  port: HTTP_PORT,
+  log,
+  onRequest: (req, res) => {
+    if (req.method === 'GET' && req.url === '/state') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, ...getPublicState() }));
+      return;
+    }
 
-  if (req.method === 'GET' && req.url === '/state') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, ...getPublicState() }));
-    return;
-  }
-
-  if (req.method === 'POST' && (req.url === '/hook' || req.url === '/simulate')) {
-    const chunks = [];
-    let totalBytes = 0;
-    req.on('data', (c) => {
-      totalBytes += c.length;
-      if (totalBytes > 65536) { req.destroy(); return; }
-      chunks.push(c);
-    });
-    req.on('end', () => {
-      try {
-        const body = JSON.parse(Buffer.concat(chunks).toString('utf8').trim() || '{}');
-        if (req.url === '/simulate') {
-          if (body.demo) runLiveDemoSequence();
-          else applySimulatedState(body.state || 'IDLE');
-        } else {
-          handleHookEvent(body);
+    if (req.method === 'POST' && (req.url === '/hook' || req.url === '/simulate')) {
+      const chunks = [];
+      let totalBytes = 0;
+      req.on('data', (c) => {
+        totalBytes += c.length;
+        if (totalBytes > 65536) { req.destroy(); return; }
+        chunks.push(c);
+      });
+      req.on('end', () => {
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8').trim() || '{}');
+          if (req.url === '/simulate') {
+            if (body.demo) runLiveDemoSequence();
+            else applySimulatedState(body.state || 'IDLE');
+          } else {
+            handleHookEvent(body);
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, state: agent.state }));
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: false, error: err.message }));
         }
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, state: agent.state }));
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, error: err.message }));
-      }
-    });
-    return;
+      });
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: 'not_found' }));
   }
-  res.writeHead(404); res.end('{}');
 });
-srv.on('error', (e) => log(`HTTP 17532 error: ${e.message}`));
-srv.listen(HTTP_PORT, '127.0.0.1', () => log(`Codex HTTP server on 127.0.0.1:${HTTP_PORT}`));
 
 function parseCliArgs(argv) {
   const out = {};
@@ -1645,7 +1271,7 @@ function parseCliArgs(argv) {
 
 const cli = parseCliArgs(process.argv);
 if (cli.port && cli.pluginUUID && cli.registerEvent) {
-  sdWs = new MiniWebSocket(`ws://127.0.0.1:${cli.port}`);
+  sdWs = new MiniWebSocket(`ws://${LOOPBACK_HOST}:${cli.port}`);
   sdWs.onopen = () => sendJson({ event: cli.registerEvent, uuid: cli.pluginUUID });
   sdWs.onmessage = (evt) => {
     try {

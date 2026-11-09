@@ -1,11 +1,15 @@
 'use strict';
 
-const http = require('http');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawn, execFile } = require('child_process');
+const {
+  LOOPBACK_HOST,
+  parseLoopbackPort,
+  createLocalhostHttpServer,
+  MiniWebSocket,
+  SessionBridge
+} = require('./session_bridge');
 
 // ============================================================================
 // 1. Platform Constants, Logging & Paths (Windows + macOS)
@@ -21,7 +25,7 @@ const CLAUDE_HOOK_SCRIPT = path.join(CLAUDE_HOOKS_DIR, 'streamdock_notify.js');
 const BUNDLED_HOOK_SCRIPT = path.join(__dirname, 'streamdock_notify.js');
 const WIN_BRIDGE_SCRIPT = path.join(__dirname, 'win_bridge.ps1');
 const LOG_FILE = path.join(__dirname, 'plugin_runtime.log');
-const HTTP_PORT = Number(process.env.CLAUDE_SD_HTTP_PORT || 17530);
+const HTTP_PORT = parseLoopbackPort(process.env.CLAUDE_SD_HTTP_PORT, 17530);
 
 function log(msg) {
   try {
@@ -37,469 +41,16 @@ try {
 } catch (_) {}
 
 // ============================================================================
-// 2. Pure Node.js RFC 6455 WebSocket Client (Zero npm dependencies, Node 20+)
+// 2. Orca / Multi-IDE / Terminal Active Session Bridge
 // ============================================================================
-class MiniWebSocket {
-  constructor(url) {
-    const parsed = new URL(url);
-    this.host = parsed.hostname || '127.0.0.1';
-    this.port = Number(parsed.port);
-    this.pathname = (parsed.pathname || '/') + (parsed.search || '');
-    this.socket = null;
-    this.rxBuf = Buffer.alloc(0);
-    this.fragOpcode = 0;
-    this.fragChunks = [];
-    this.readyState = 0;
-
-    this.onopen = null;
-    this.onmessage = null;
-    this.onclose = null;
-    this.onerror = null;
-
-    this._connect();
-  }
-
-  _connect() {
-    const key = crypto.randomBytes(16).toString('base64');
-    const req = http.request({
-      hostname: this.host,
-      port: this.port,
-      path: this.pathname,
-      method: 'GET',
-      headers: {
-        Connection: 'Upgrade',
-        Upgrade: 'websocket',
-        'Sec-WebSocket-Version': '13',
-        'Sec-WebSocket-Key': key
-      }
-    });
-
-    req.on('upgrade', (res, socket, head) => {
-      this.socket = socket;
-      this.socket.setNoDelay(true);
-      this.readyState = 1;
-      if (head && head.length > 0) {
-        this.rxBuf = Buffer.concat([this.rxBuf, head]);
-      }
-      socket.on('data', (chunk) => {
-        this.rxBuf = Buffer.concat([this.rxBuf, chunk]);
-        this._drainFrames();
-      });
-      socket.on('close', () => {
-        this.readyState = 3;
-        if (this.onclose) this.onclose();
-      });
-      socket.on('error', (err) => {
-        if (this.onerror) this.onerror(err);
-      });
-      if (this.onopen) this.onopen();
-      if (this.rxBuf.length > 0) this._drainFrames();
-    });
-
-    req.on('error', (err) => {
-      this.readyState = 3;
-      if (this.onerror) this.onerror(err);
-    });
-
-    req.end();
-  }
-
-  _drainFrames() {
-    while (this.rxBuf.length >= 2) {
-      const b0 = this.rxBuf[0];
-      const b1 = this.rxBuf[1];
-      const fin = (b0 & 0x80) !== 0;
-      const opcode = b0 & 0x0f;
-      const masked = (b1 & 0x80) !== 0;
-      let payloadLen = b1 & 0x7f;
-      let offset = 2;
-
-      if (payloadLen === 126) {
-        if (this.rxBuf.length < 4) return;
-        payloadLen = this.rxBuf.readUInt16BE(2);
-        offset = 4;
-      } else if (payloadLen === 127) {
-        if (this.rxBuf.length < 10) return;
-        payloadLen = Number(this.rxBuf.readBigUInt64BE(2));
-        offset = 10;
-      }
-
-      const maskLen = masked ? 4 : 0;
-      if (this.rxBuf.length < offset + maskLen + payloadLen) return;
-
-      let payload = this.rxBuf.subarray(offset + maskLen, offset + maskLen + payloadLen);
-      if (masked) {
-        const mask = this.rxBuf.subarray(offset, offset + 4);
-        const unmasked = Buffer.allocUnsafe(payloadLen);
-        for (let i = 0; i < payloadLen; i++) {
-          unmasked[i] = payload[i] ^ mask[i & 3];
-        }
-        payload = unmasked;
-      } else {
-        payload = Buffer.from(payload);
-      }
-
-      this.rxBuf = this.rxBuf.subarray(offset + maskLen + payloadLen);
-
-      if (opcode === 0x08) {
-        this.close();
-        return;
-      } else if (opcode === 0x09) {
-        this._sendFrame(0x0a, payload);
-      } else if (opcode === 0x01 || opcode === 0x02) {
-        if (fin) {
-          if (opcode === 0x01 && this.onmessage) {
-            this.onmessage({ data: payload.toString('utf8') });
-          }
-        } else {
-          this.fragOpcode = opcode;
-          this.fragChunks = [payload];
-        }
-      } else if (opcode === 0x00) {
-        this.fragChunks.push(payload);
-        if (fin) {
-          const full = Buffer.concat(this.fragChunks);
-          const origOp = this.fragOpcode;
-          this.fragChunks = [];
-          this.fragOpcode = 0;
-          if (origOp === 0x01 && this.onmessage) {
-            this.onmessage({ data: full.toString('utf8') });
-          }
-        }
-      }
-    }
-  }
-
-  _sendFrame(opcode, payloadBuf) {
-    if (this.readyState !== 1 || !this.socket) return;
-    const len = payloadBuf.length;
-    let header;
-    if (len < 126) {
-      header = Buffer.allocUnsafe(2);
-      header[0] = 0x80 | (opcode & 0x0f);
-      header[1] = 0x80 | len;
-    } else if (len <= 65535) {
-      header = Buffer.allocUnsafe(4);
-      header[0] = 0x80 | (opcode & 0x0f);
-      header[1] = 0x80 | 126;
-      header.writeUInt16BE(len, 2);
-    } else {
-      header = Buffer.allocUnsafe(10);
-      header[0] = 0x80 | (opcode & 0x0f);
-      header[1] = 0x80 | 127;
-      header.writeBigUInt64BE(BigInt(len), 2);
-    }
-
-    const mask = crypto.randomBytes(4);
-    const maskedPayload = Buffer.allocUnsafe(len);
-    for (let i = 0; i < len; i++) {
-      maskedPayload[i] = payloadBuf[i] ^ mask[i & 3];
-    }
-
-    this.socket.write(Buffer.concat([header, mask, maskedPayload]));
-  }
-
-  send(data) {
-    const buf = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8');
-    this._sendFrame(0x01, buf);
-  }
-
-  close() {
-    if (this.readyState === 3) return;
-    this.readyState = 3;
-    try {
-      if (this.socket) this.socket.end();
-    } catch (_) {}
-  }
-}
-
-// ============================================================================
-// 3. Cross-Platform Input & Window Bridge (Windows Win32 + macOS JXA/Cocoa)
-// ============================================================================
-const MAC_JXA_SCRIPT = `
-function run(argv) {
-  const req = JSON.parse(argv[0]);
-  const se = Application("System Events");
-  const termNames = ["iTerm2", "iTerm", "Terminal", "Warp", "Ghostty", "wezterm-gui", "WezTerm", "Alacritty", "kitty"];
-  const ideNames = ["Cursor", "Code", "Visual Studio Code", "Windsurf", "Antigravity", "Zed"];
-
-  function findCodingProc() {
-    const procs = se.applicationProcesses.whose({ backgroundOnly: false })();
-    let claudeTerm = null, anyTerm = null, claudeIde = null, anyIde = null;
-    for (let i = 0; i < procs.length; i++) {
-      const p = procs[i];
-      let pName = "";
-      try { pName = p.name(); } catch (e) { continue; }
-      const isTerm = termNames.indexOf(pName) >= 0;
-      const isIde = ideNames.indexOf(pName) >= 0;
-      if (!isTerm && !isIde) continue;
-
-      let hasClaude = false;
-      try {
-        const wins = p.windows();
-        for (let w = 0; w < wins.length; w++) {
-          const wt = String(wins[w].name() || "");
-          if (wt.toLowerCase().indexOf("claude") >= 0) { hasClaude = true; break; }
-        }
-      } catch (e) {}
-
-      if (isTerm) {
-        if (hasClaude && !claudeTerm) claudeTerm = p;
-        else if (!anyTerm) anyTerm = p;
-      } else if (isIde) {
-        if (hasClaude && !claudeIde) claudeIde = p;
-        else if (!anyIde) anyIde = p;
-      }
-    }
-    return claudeTerm || claudeIde || anyTerm || anyIde;
-  }
-
-  if (req.cmd === "focus") {
-    const target = findCodingProc();
-    if (target) {
-      target.frontmost = true;
-      return JSON.stringify({ ok: true, foundCoding: true, target: target.name() });
-    }
-    if (req.launchIfMissing) {
-      const term = Application("Terminal");
-      term.activate();
-      return JSON.stringify({ ok: true, launched: true, target: "Terminal" });
-    }
-    return JSON.stringify({ ok: false, foundCoding: false });
-  }
-
-  if (req.cmd === "launch_claude") {
-    const sqEsc = String.fromCharCode(39, 92, 39, 39);
-    const cwdEsc = String(req.cwd || "").split("'").join(sqEsc);
-    const cdPart = cwdEsc ? ("cd '" + cwdEsc + "' && ") : "";
-    const shCmd = cdPart + "(command -v claude >/dev/null 2>&1 && claude || echo 'Claude Code CLI Ready')";
-    try {
-      const iterm = Application("iTerm");
-      iterm.activate();
-      const win = iterm.createWindowWithDefaultProfile();
-      win.currentSession.write({ text: shCmd });
-      return JSON.stringify({ ok: true, launched: "iTerm" });
-    } catch (e) {
-      const term = Application("Terminal");
-      term.activate();
-      term.doScript(shCmd);
-      return JSON.stringify({ ok: true, launched: "Terminal" });
-    }
-  }
-
-  if (req.cmd === "key") {
-    const combo = String(req.combo || "").toLowerCase();
-    const isGlobal = (combo === "voice" || combo === "screen_snip");
-    const target = findCodingProc();
-    if (req.focus && target && combo !== "screen_snip") {
-      target.frontmost = true;
-      delay(0.04);
-    }
-    if (!isGlobal && req.requireCoding && !target) {
-      return JSON.stringify({ ok: false, skipped: "no_coding_window" });
-    }
-
-    switch (combo) {
-      case "enter":       se.keyCode(36); break;
-      case "esc":         se.keyCode(53); break;
-      case "2":           se.keystroke("2"); break;
-      case "1":           se.keystroke("1"); break;
-      case "y":           se.keystroke("y"); break;
-      case "n":           se.keystroke("n"); break;
-      case "ctrl+c":      se.keyCode(8, { using: "control down" }); break;
-      case "ctrl+l":      se.keyCode(37, { using: "control down" }); break;
-      case "shift+tab":   se.keyCode(48, { using: "shift down" }); break;
-      case "thinking":    se.keyCode(17, { using: "option down" }); break;
-      case "image_paste": se.keyCode(9, { using: "control down" }); break;
-      case "screen_snip": se.keyCode(21, { using: ["command down", "control down", "shift down"] }); break;
-      case "cmd+v":       se.keyCode(9, { using: "command down" }); break;
-      case "cmd+v+enter":
-        se.keyCode(9, { using: "command down" });
-        delay(0.05);
-        se.keyCode(36);
-        break;
-      case "voice": {
-        let triggered = false;
-        const menuNames = ["Edit", "편집"];
-        for (let m = 0; m < menuNames.length && !triggered; m++) {
-          try {
-            const fg = se.applicationProcesses.whose({ frontmost: true })()[0];
-            const editMenu = fg.menuBars[0].menuBarItems.byName(menuNames[m]);
-            const items = editMenu.menus[0].menuItems();
-            for (let i = 0; i < items.length; i++) {
-              const nm = String(items[i].name() || "");
-              if (nm.indexOf("Dictation") >= 0 || nm.indexOf("받아쓰기") >= 0) {
-                items[i].click();
-                triggered = true;
-                break;
-              }
-            }
-          } catch (e) {}
-        }
-        if (!triggered) {
-          se.keyCode(63);
-          delay(0.07);
-          se.keyCode(63);
-        }
-        break;
-      }
-      default: se.keyCode(36); break;
-    }
-    return JSON.stringify({ ok: true, combo: combo });
-  }
-
-  return JSON.stringify({ ok: false, error: "unknown_cmd" });
-}
-`;
-
-class PlatformBridge {
-  constructor() {
-    this.winProc = null;
-    this.startingWin = false;
-    if (IS_WIN && fs.existsSync(WIN_BRIDGE_SCRIPT)) {
-      this._spawnWinBridge();
-    }
-  }
-
-  _spawnWinBridge() {
-    if (this.startingWin || this.winProc) return;
-    this.startingWin = true;
-    try {
-      const child = spawn(
-        'powershell.exe',
-        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', WIN_BRIDGE_SCRIPT],
-        { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }
-      );
-      child.stdin.setDefaultEncoding('utf8');
-      child.stdout.on('data', (d) => {
-        const s = d.toString('utf8').trim();
-        if (s) log(`[WinBridge] ${s}`);
-      });
-      child.stderr.on('data', (d) => {
-        const s = d.toString('utf8').trim();
-        if (s) log(`[WinBridge:ERR] ${s}`);
-      });
-      child.on('exit', (code) => {
-        log(`[WinBridge] exited (${code})`);
-        this.winProc = null;
-        this.startingWin = false;
-      });
-      this.winProc = child;
-      this.startingWin = false;
-    } catch (err) {
-      log(`[WinBridge] spawn failed: ${err.message}`);
-      this.startingWin = false;
-    }
-  }
-
-  _sendWin(cmdObj) {
-    if (!this.winProc) this._spawnWinBridge();
-    if (this.winProc && this.winProc.stdin && !this.winProc.stdin.destroyed) {
-      try {
-        this.winProc.stdin.write(JSON.stringify(cmdObj) + '\n', 'utf8');
-      } catch (err) {
-        log(`[WinBridge] write error: ${err.message}`);
-      }
-    }
-  }
-
-  _runMacJxa(reqObj, cb) {
-    execFile(
-      '/usr/bin/osascript',
-      ['-l', 'JavaScript', '-e', MAC_JXA_SCRIPT, JSON.stringify(reqObj)],
-      { timeout: 3500 },
-      (err, stdout, stderr) => {
-        if (err) {
-          log(`[MacBridge:ERR] ${err.message} ${stderr || ''}`.trim());
-          if (cb) cb(null);
-          return;
-        }
-        const out = String(stdout || '').trim();
-        if (out) log(`[MacBridge] ${out}`);
-        if (cb) {
-          try { cb(JSON.parse(out)); } catch (_) { cb(null); }
-        }
-      }
-    );
-  }
-
-  _macClipboardWrite(text, done) {
-    try {
-      const pb = spawn('/usr/bin/pbcopy', [], {
-        env: { ...process.env, LANG: 'en_US.UTF-8', LC_CTYPE: 'UTF-8' },
-        stdio: ['pipe', 'ignore', 'ignore']
-      });
-      pb.stdin.write(String(text), 'utf8');
-      pb.stdin.end();
-      pb.on('close', () => done && done());
-      pb.on('error', () => done && done());
-    } catch (_) {
-      if (done) done();
-    }
-  }
-
-  focusTerminal(launchIfMissing = false, cwd = '') {
-    if (IS_WIN) this._sendWin({ cmd: 'focus', launchIfMissing, cwd });
-    else if (IS_MAC) this._runMacJxa({ cmd: 'focus', launchIfMissing, cwd });
-  }
-
-  sendLogicalKey(actionKey, focus = true, requireCoding = true) {
-    if (IS_WIN) {
-      const winMap = {
-        thinking: 'alt+t',
-        image_paste: 'alt+v',
-        screen_snip: 'win+shift+s',
-        voice: 'win+h'
-      };
-      const combo = winMap[actionKey] || actionKey;
-      this._sendWin({ cmd: 'key', combo, focus, requireCoding });
-    } else if (IS_MAC) {
-      this._runMacJxa({ cmd: 'key', combo: actionKey, focus, requireCoding });
-    }
-  }
-
-  sendText(text, enter = true, focus = true, requireCoding = true) {
-    if (IS_WIN) {
-      this._sendWin({ cmd: 'text', text, enter, focus, requireCoding });
-      return;
-    }
-    if (IS_MAC) {
-      this._runMacJxa({ cmd: 'focus', launchIfMissing: false }, (res) => {
-        if (requireCoding && (!res || !res.foundCoding)) {
-          log('[MacBridge] Skipped sendText: no coding window open');
-          return;
-        }
-        execFile(
-          '/usr/bin/pbpaste',
-          [],
-          { env: { ...process.env, LANG: 'en_US.UTF-8', LC_CTYPE: 'UTF-8' }, timeout: 1000 },
-          (pbErr, prevClip) => {
-            const hadPrev = !pbErr && typeof prevClip === 'string';
-            this._macClipboardWrite(text, () => {
-              this._runMacJxa(
-                { cmd: 'key', combo: enter ? 'cmd+v+enter' : 'cmd+v', focus, requireCoding: false },
-                () => {
-                  if (hadPrev) {
-                    setTimeout(() => this._macClipboardWrite(prevClip), 220);
-                  }
-                }
-              );
-            });
-          }
-        );
-      });
-    }
-  }
-
-  launchClaude(cwd = '') {
-    let safeCwd = '';
-    try { if (cwd && fs.existsSync(cwd) && fs.statSync(cwd).isDirectory()) safeCwd = cwd; } catch (_) {}
-    if (IS_WIN) this._sendWin({ cmd: 'launch_claude', cwd: safeCwd });
-    else if (IS_MAC) this._runMacJxa({ cmd: 'launch_claude', cwd: safeCwd });
-  }
-}
-
-const bridge = new PlatformBridge();
+const bridge = new SessionBridge({
+  agentKind: 'claude',
+  agentBinaries: ['claude', 'claude-code'],
+  agentKeywords: ['claude'],
+  pureGuiApps: ['claude'],
+  winBridgeScript: WIN_BRIDGE_SCRIPT,
+  log
+});
 
 // ============================================================================
 // 4. Claude Code Settings & Hooks Sync (~/.claude/settings.json)
@@ -515,22 +66,22 @@ const MODEL_META = {
 
 const EFFORT_ORDER = ['low', 'medium', 'high', 'max'];
 const EFFORT_META = {
-  low:    { label: 'LOW',  kor: '강도 LOW',  bars: 1, color: '#CBD5E1', border: '#94A3B8' },
-  medium: { label: 'MED',  kor: '강도 MED',  bars: 2, color: '#7DD3FC', border: '#38BDF8' },
-  high:   { label: 'HIGH', kor: '강도 HIGH', bars: 3, color: '#FCD34D', border: '#F59E0B' },
-  max:    { label: 'MAX',  kor: '강도 MAX',  bars: 4, color: '#F472B6', border: '#EC4899' }
+  low:    { label: 'LOW',  kor: 'EFF LOW',  bars: 1, color: '#CBD5E1', border: '#94A3B8' },
+  medium: { label: 'MED',  kor: 'EFF MED',  bars: 2, color: '#7DD3FC', border: '#38BDF8' },
+  high:   { label: 'HIGH', kor: 'EFF HIGH', bars: 3, color: '#FCD34D', border: '#F59E0B' },
+  max:    { label: 'MAX',  kor: 'EFF MAX',  bars: 4, color: '#F472B6', border: '#EC4899' }
 };
 
 const PERM_ORDER = ['default', 'acceptEdits', 'plan'];
 const PERM_META = {
-  default:     { label: '일반',     color: '#7DD3FC', border: '#38BDF8' },
-  acceptEdits: { label: '자동수정', color: '#34D399', border: '#10B981' },
-  plan:        { label: '플랜',     color: '#C084FC', border: '#A855F7' }
+  default:     { label: 'DEFAULT',   color: '#7DD3FC', border: '#38BDF8' },
+  acceptEdits: { label: 'AUTO-EDIT', color: '#34D399', border: '#10B981' },
+  plan:        { label: 'PLAN',      color: '#C084FC', border: '#A855F7' }
 };
 
 const agent = {
   state: 'IDLE',
-  currentTool: '대기',
+  currentTool: 'IDLE',
   rawToolName: '',
   waitingDetail: '',
   toolCount: 0,
@@ -680,6 +231,7 @@ try {
 // ============================================================================
 function handleHookEvent(payload) {
   if (!payload || typeof payload !== 'object') return;
+  bridge.updateFromHook(payload);
   const evt = String(payload.hook_event_name || payload.event || '').trim();
   agent.lastEventAt = Date.now();
 
@@ -700,7 +252,7 @@ function handleHookEvent(payload) {
     case 'SessionStart':
       agent.state = 'IDLE';
       agent.rawToolName = '';
-      agent.currentTool = '대기';
+      agent.currentTool = 'IDLE';
       agent.waitingDetail = '';
       agent.toolCount = 0;
       agent.subagentCount = 0;
@@ -711,7 +263,7 @@ function handleHookEvent(payload) {
       agent.state = 'RUNNING';
       agent.turnStartedAt = Date.now();
       agent.rawToolName = 'Think';
-      agent.currentTool = '추론중';
+      agent.currentTool = 'Thinking';
       agent.waitingDetail = '';
       agent.toolCount = 0;
       break;
@@ -721,15 +273,15 @@ function handleHookEvent(payload) {
       if (!agent.turnStartedAt) agent.turnStartedAt = Date.now();
       agent.toolCount += 1;
       agent.rawToolName = toolName || 'Tool';
-      agent.currentTool = toolName || '실행중';
+      agent.currentTool = toolName || 'Running';
       agent.waitingDetail = '';
       break;
 
     case 'PermissionRequest':
       agent.state = 'WAITING_PERMISSION';
       agent.rawToolName = toolName || 'Approve';
-      agent.waitingDetail = toolName ? `${toolName}` : '승인요청';
-      agent.currentTool = toolName || '승인대기';
+      agent.waitingDetail = toolName ? `${toolName}` : 'Approval';
+      agent.currentTool = toolName || 'Approve';
       break;
 
     case 'PostToolUse':
@@ -748,7 +300,7 @@ function handleHookEvent(payload) {
       agent.state = 'RUNNING';
       if (!agent.turnStartedAt) agent.turnStartedAt = Date.now();
       agent.rawToolName = 'Subagent';
-      agent.currentTool = `에이전트×${agent.subagentCount}`;
+      agent.currentTool = `Agent×${agent.subagentCount}`;
       break;
 
     case 'SubagentStop':
@@ -760,13 +312,13 @@ function handleHookEvent(payload) {
       const msg = String(payload.message || payload.title || '').trim();
       if (
         nType.includes('permission') ||
-        /permission|allow|approve|승인|허용/i.test(msg)
+        /permission|allow|approve/i.test(msg)
       ) {
         agent.state = 'WAITING_PERMISSION';
-        agent.waitingDetail = '승인요청';
+        agent.waitingDetail = 'Approval';
       } else {
         agent.state = 'WAITING_INPUT';
-        agent.waitingDetail = '입력대기';
+        agent.waitingDetail = 'Input';
       }
       break;
     }
@@ -779,7 +331,7 @@ function handleHookEvent(payload) {
       agent.subagentCount = 0;
       agent.waitingDetail = '';
       agent.rawToolName = 'Done';
-      agent.currentTool = '완료';
+      agent.currentTool = 'Done';
       agent.state = 'COMPLETED';
       break;
 
@@ -799,7 +351,7 @@ function applySimulatedState(targetState) {
     agent.state = 'IDLE';
     agent.turnStartedAt = 0;
     agent.rawToolName = '';
-    agent.currentTool = '대기';
+    agent.currentTool = 'IDLE';
     agent.waitingDetail = '';
   } else if (s === 'RUNNING') {
     agent.state = 'RUNNING';
@@ -813,19 +365,19 @@ function applySimulatedState(targetState) {
     if (!agent.turnStartedAt) agent.turnStartedAt = Date.now() - 8000;
     agent.rawToolName = 'Bash';
     agent.currentTool = 'Bash';
-    agent.waitingDetail = 'Bash 승인';
+    agent.waitingDetail = 'Bash Approval';
   } else if (s === 'WAITING_INPUT') {
     agent.state = 'WAITING_INPUT';
     agent.rawToolName = 'Input';
-    agent.currentTool = '입력대기';
-    agent.waitingDetail = '선택 대기';
+    agent.currentTool = 'Input';
+    agent.waitingDetail = 'Awaiting Choice';
   } else if (s === 'COMPLETED') {
     agent.state = 'COMPLETED';
     agent.lastDurationSec = 18;
     agent.turnStartedAt = 0;
     agent.toolCount = Math.max(5, agent.toolCount);
     agent.rawToolName = 'Done';
-    agent.currentTool = '완료';
+    agent.currentTool = 'Done';
     agent.waitingDetail = '';
   }
   renderAllContexts();
@@ -1178,7 +730,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
     let border = '#52525B';
     let col = '#94A3B8';
     let icon = VEC.terminalPrompt('#94A3B8');
-    let label = '대기중';
+    let label = 'IDLE';
     let labelColor = '#E2E8F0';
     let badge = agent.hooksInstalled ? 'ON' : '!';
 
@@ -1191,7 +743,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
       else if (tn.includes('read') || tn.includes('grep') || tn.includes('glob')) icon = VEC.searchLens('#38BDF8');
       else if (tn.includes('subagent') || tn.includes('task')) icon = VEC.linkNodes('#38BDF8');
       else icon = VEC.terminalPrompt('#38BDF8');
-      label = agent.currentTool || '실행중';
+      label = agent.currentTool || 'Running';
       labelColor = '#FFFFFF';
       badge = `${agent.toolCount}`;
     } else if (agent.state === 'WAITING_PERMISSION') {
@@ -1199,7 +751,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
       border = pulseOn ? '#FDE047' : '#F59E0B';
       col = '#FDE047';
       icon = VEC.warningTriangle('#FACC15');
-      label = '권한승인';
+      label = 'PERMIT';
       labelColor = '#FEF08A';
       badge = '!';
     } else if (agent.state === 'WAITING_INPUT') {
@@ -1207,7 +759,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
       border = pulseOn ? '#FB923C' : '#F43F5E';
       col = '#FB923C';
       icon = VEC.questionBubble('#FB923C');
-      label = '입력대기';
+      label = 'INPUT';
       labelColor = '#FEF08A';
       badge = '?';
     } else if (agent.state === 'COMPLETED') {
@@ -1215,7 +767,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
       border = '#10B981';
       col = '#34D399';
       icon = VEC.checkCircle('#34D399');
-      label = `${agent.toolCount}회 완료`;
+      label = `${agent.toolCount} DONE`;
       labelColor = '#A7F3D0';
       badge = agent.lastDurationSec ? `${agent.lastDurationSec}s` : '✓';
     }
@@ -1257,7 +809,7 @@ function renderStatusSvg(settings = {}, flashed = false) {
   let border = '#D97757';
   let glow = '#D97757';
   let icon = VEC.claudeStar('#FF8B66');
-  let label = '대기';
+  let label = 'IDLE';
   let labelColor = '#FFFFFF';
   let badge = '';
 
@@ -1274,21 +826,21 @@ function renderStatusSvg(settings = {}, flashed = false) {
     border = pulseOn ? '#FDE047' : '#F59E0B';
     glow = '#F59E0B';
     icon = VEC.warningTriangle(pulseOn ? '#FDE047' : '#F59E0B');
-    label = '승인대기';
+    label = 'PERMIT';
     labelColor = '#FEF08A';
   } else if (agent.state === 'WAITING_INPUT') {
     bg = pulseOn ? '#431407' : '#1F0B05';
     border = pulseOn ? '#FDBA74' : '#FB923C';
     glow = '#FB923C';
     icon = VEC.questionBubble('#FB923C');
-    label = '입력대기';
+    label = 'INPUT';
     labelColor = '#FEF08A';
   } else if (agent.state === 'COMPLETED') {
     bg = '#05291A';
     border = '#10B981';
     glow = '#10B981';
     icon = VEC.checkCircle('#34D399');
-    label = '완료';
+    label = 'DONE';
     labelColor = '#6EE7B7';
     badge = agent.lastDurationSec ? `${agent.lastDurationSec}s` : '';
   }
@@ -1324,7 +876,7 @@ function renderApprovalSvg(settings = {}, flashed = false) {
       borderWidth: waitingPerm ? 6 : 4.5,
       glowColor: col,
       iconSvg: VEC.doubleCheck(col),
-      label: '세션허용',
+      label: 'SESSION',
       labelColor: waitingPerm ? '#FEF08A' : '#FFFFFF',
       badge: '2',
       badgeColor: col,
@@ -1340,7 +892,7 @@ function renderApprovalSvg(settings = {}, flashed = false) {
       borderWidth: activeRun ? 5.5 : 4.5,
       glowColor: col,
       iconSvg: VEC.stopCross(col),
-      label: '중단',
+      label: 'STOP',
       labelColor: '#FFFFFF',
       badge: 'ESC',
       badgeColor: '#FDA4AF',
@@ -1355,7 +907,7 @@ function renderApprovalSvg(settings = {}, flashed = false) {
     borderWidth: waitingAny ? 6 : 4.5,
     glowColor: col,
     iconSvg: VEC.bigCheck(col),
-    label: '승인',
+    label: 'APPROVE',
     labelColor: waitingAny ? '#FEF08A' : '#FFFFFF',
     badge: '⏎',
     badgeColor: col,
@@ -1422,7 +974,7 @@ function renderModeSvg(settings = {}, flashed = false) {
       borderWidth: 4.5,
       glowColor: on ? '#A855F7' : '',
       iconSvg: VEC.bulbSpark(on, col),
-      label: on ? '사고 ON' : '사고 OFF',
+      label: on ? 'THINK ON' : 'THINK OFF',
       labelColor: on ? '#F3E8FF' : '#CBD5E1',
       badge: IS_MAC ? '⌥T' : 'Alt+T',
       badgeColor: '#E9D5FF',
@@ -1452,7 +1004,7 @@ function renderModeSvg(settings = {}, flashed = false) {
 
 const CMD_PRESETS = {
   compact: {
-    shortLabel: '압축',
+    shortLabel: 'COMPACT',
     color: '#FBBF24',
     border: '#F59E0B',
     cmd: '/compact',
@@ -1460,7 +1012,7 @@ const CMD_PRESETS = {
     iconFn: () => VEC.compress('#FBBF24')
   },
   clear: {
-    shortLabel: '초기화',
+    shortLabel: 'CLEAR',
     color: '#F87171',
     border: '#EF4444',
     cmd: '/clear',
@@ -1468,7 +1020,7 @@ const CMD_PRESETS = {
     iconFn: () => VEC.resetSweep('#F87171')
   },
   cost: {
-    shortLabel: '비용·재개',
+    shortLabel: 'COST',
     color: '#34D399',
     border: '#10B981',
     cmd: '/cost',
@@ -1476,18 +1028,18 @@ const CMD_PRESETS = {
     iconFn: () => VEC.coinResume('#34D399')
   },
   vibe_fix: {
-    shortLabel: '빌드수정',
+    shortLabel: 'FIX',
     color: '#38BDF8',
     border: '#0284C7',
-    cmd: '빌드와 테스트를 실행하고 에러나 실패한 항목이 있으면 원인을 찾아 수정해줘',
+    cmd: 'Run the build and tests, and if any errors or failures occur, find the root cause and fix them.',
     longCmd: '',
     iconFn: () => VEC.wrenchFix('#38BDF8')
   },
   vibe_commit: {
-    shortLabel: '커밋',
+    shortLabel: 'COMMIT',
     color: '#FF8B66',
     border: '#D97757',
-    cmd: 'git status와 diff를 확인해서 변경사항을 깔끔하게 요약하고 적절한 커밋 메시지로 커밋해줘',
+    cmd: 'Check git status and diff, summarize the changes cleanly, and create a git commit with an appropriate message.',
     longCmd: '/diff',
     iconFn: () => VEC.gitGraph('#FF8B66')
   }
@@ -1497,14 +1049,14 @@ function renderCommandSvg(settings = {}, flashed = false) {
   const presetKey = settings.preset || 'compact';
   const iconOnly = settings.displayStyle === 'icon_only';
   const preset = CMD_PRESETS[presetKey] || {
-    shortLabel: settings.label || '명령',
+    shortLabel: settings.label || 'CMD',
     color: '#FBBF24',
     border: '#F59E0B',
     iconFn: () => VEC.terminalPrompt('#FBBF24')
   };
 
   // Map verbose default preset labels to ultra-clean icon labels unless customized by user
-  const defaultLegacyLabels = new Set(['/compact', '/clear', '/cost', '빌드 & 수정', '빌드·수정', '요약 & 커밋', '요약·커밋', 'COMPACT']);
+  const defaultLegacyLabels = new Set(['/compact', '/clear', '/cost', 'Build & Fix', 'Summarize & Commit', 'COMPACT']);
   const label =
     settings.label && !defaultLegacyLabels.has(settings.label)
       ? settings.label
@@ -1533,7 +1085,7 @@ function renderUtilitySvg(settings = {}, flashed = false) {
       borderWidth: 4.5,
       glowColor: '#06B6D4',
       iconSvg: VEC.screenshotFrame('#22D3EE'),
-      label: '스샷',
+      label: 'PASTE',
       labelColor: '#FFFFFF',
       badge: IS_MAC ? '⌃V' : 'Alt+V',
       badgeColor: '#67E8F9',
@@ -1548,7 +1100,7 @@ function renderUtilitySvg(settings = {}, flashed = false) {
       borderWidth: 4.5,
       glowColor: '#D97757',
       iconSvg: VEC.terminalPrompt('#FF8B66'),
-      label: '터미널',
+      label: 'TERMINAL',
       labelColor: '#FFFFFF',
       iconOnly
     });
@@ -1562,7 +1114,7 @@ function renderUtilitySvg(settings = {}, flashed = false) {
       borderWidth: 4.5,
       glowColor: col,
       iconSvg: VEC.linkNodes(col),
-      label: '훅점검',
+      label: 'HOOKS',
       labelColor: '#FFFFFF',
       iconOnly
     });
@@ -1575,7 +1127,7 @@ function renderUtilitySvg(settings = {}, flashed = false) {
     borderWidth: 4.5,
     glowColor: '#EC4899',
     iconSvg: VEC.mic('#F472B6'),
-    label: '음성',
+    label: 'VOICE',
     labelColor: '#FFFFFF',
     badge: IS_MAC ? 'Fn' : 'Win+H',
     badgeColor: '#F9A8D4',
@@ -1693,7 +1245,7 @@ function handleActionTrigger(ctx, isLongPress) {
       } else {
         if (agent.state === 'COMPLETED') {
           agent.state = 'IDLE';
-          agent.currentTool = '대기';
+          agent.currentTool = 'IDLE';
           renderAllContexts();
         }
         bridge.focusTerminal(true, agent.cwdFull);
@@ -1725,7 +1277,7 @@ function handleActionTrigger(ctx, isLongPress) {
           agent.state = 'IDLE';
           agent.turnStartedAt = 0;
           agent.waitingDetail = '';
-          agent.currentTool = '중단됨';
+          agent.currentTool = 'Stopped';
           renderAllContexts();
         }
       } else {
@@ -1777,7 +1329,7 @@ function handleActionTrigger(ctx, isLongPress) {
         updateClaudeSettings((cfg) => {
           cfg.effortLevel = nextEffort;
         });
-        if (s.sendSlashCommand === true) {
+        if (s.sendSlashCommand !== false) {
           bridge.sendText(`/effort ${nextEffort}`, true, true, true);
         }
       } else if (sType === 'thinking') {
@@ -1820,7 +1372,7 @@ function handleActionTrigger(ctx, isLongPress) {
         }
       } else if (uType === 'launch') {
         if (isLongPress) {
-          bridge.launchClaude(agent.cwdFull);
+          bridge.launchAgent(agent.cwdFull);
         } else {
           bridge.focusTerminal(true, agent.cwdFull);
         }
@@ -1869,70 +1421,60 @@ function getPublicState() {
     effortLevel: agent.effortLevel,
     thinkingEnabled: agent.thinkingEnabled,
     permMode: agent.permMode,
+    sessionHost: bridge.session.hostApp || '',
     hooksInstalled: agent.hooksInstalled,
     connectedContexts: contexts.size
   };
 }
 
 function startLocalHttpServer() {
-  const srv = http.createServer((req, res) => {
-    const origin = String(req.headers.origin || '');
-    if (origin && origin !== 'null' && !origin.startsWith('file://')) {
-      res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ ok: false, error: 'forbidden_origin' }));
-      return;
-    }
+  createLocalhostHttpServer({
+    port: HTTP_PORT,
+    log,
+    onRequest: (req, res) => {
+      if (req.method === 'GET' && req.url === '/state') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, ...getPublicState() }));
+        return;
+      }
 
-    if (req.method === 'GET' && req.url === '/state') {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ ok: true, ...getPublicState() }));
-      return;
-    }
-
-    if (req.method === 'POST' && (req.url === '/hook' || req.url === '/simulate')) {
-      const chunks = [];
-      let totalBytes = 0;
-      req.on('data', (c) => {
-        totalBytes += c.length;
-        if (totalBytes > 65536) {
-          req.destroy();
-          return;
-        }
-        chunks.push(c);
-      });
-      req.on('end', () => {
-        try {
-          const raw = Buffer.concat(chunks).toString('utf8').trim();
-          const body = raw ? JSON.parse(raw) : {};
-          if (req.url === '/simulate') {
-            if (body.demo) {
-              runLiveDemoSequence();
-            } else {
-              applySimulatedState(body.state || 'IDLE');
-            }
-          } else {
-            handleHookEvent(body);
+      if (req.method === 'POST' && (req.url === '/hook' || req.url === '/simulate')) {
+        const chunks = [];
+        let totalBytes = 0;
+        req.on('data', (c) => {
+          totalBytes += c.length;
+          if (totalBytes > 65536) {
+            req.destroy();
+            return;
           }
-          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({ ok: true, state: agent.state }));
-        } catch (err) {
-          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({ ok: false, error: err.message }));
-        }
-      });
-      return;
+          chunks.push(c);
+        });
+        req.on('end', () => {
+          try {
+            const raw = Buffer.concat(chunks).toString('utf8').trim();
+            const body = raw ? JSON.parse(raw) : {};
+            if (req.url === '/simulate') {
+              if (body.demo) {
+                runLiveDemoSequence();
+              } else {
+                applySimulatedState(body.state || 'IDLE');
+              }
+            } else {
+              handleHookEvent(body);
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ ok: true, state: agent.state }));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ ok: false, error: err.message }));
+          }
+        });
+        return;
+      }
+
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'not_found' }));
     }
-
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: false, error: 'not_found' }));
-  });
-
-  srv.on('error', (err) => {
-    log(`HTTP server error on ${HTTP_PORT}: ${err.message}`);
-  });
-
-  srv.listen(HTTP_PORT, '127.0.0.1', () => {
-    log(`Claude Hook HTTP server listening on http://127.0.0.1:${HTTP_PORT} (${process.platform})`);
   });
 }
 
@@ -1960,7 +1502,7 @@ const cli = parseCliArgs(process.argv);
 log(`Starting plugin (${process.platform}) port=${cli.port} uuid=${cli.pluginUUID} event=${cli.registerEvent}`);
 
 if (cli.port && cli.pluginUUID && cli.registerEvent) {
-  sdWs = new MiniWebSocket(`ws://127.0.0.1:${cli.port}`);
+  sdWs = new MiniWebSocket(`ws://${LOOPBACK_HOST}:${cli.port}`);
 
   sdWs.onopen = () => {
     log(`Connected to Stream Dock WebSocket on port ${cli.port}`);
