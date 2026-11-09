@@ -1,30 +1,30 @@
 {
-  "Name": "OpenAI Codex 바이브코딩",
-  "Description": "OpenAI Codex 에이전트 실시간 구동 상태 모니터 및 바이브코딩 컨트롤러",
-  "Category": "OpenAI Codex 바이브코딩",
+  "Name": "OpenAI Codex Vibe Coding",
+  "Description": "Real-time OpenAI Codex agent status monitor & Vibe Coding controller",
+  "Category": "OpenAI Codex Vibe Coding",
   "com.vibecoding.codex.status": {
-    "Name": "에이전트 구동 상태",
-    "Tooltip": "OpenAI Codex 실시간 구동 상태(대기/동작중/승인·질문대기/완료) 표시 및 터미널 포커스"
+    "Name": "Agent Live Status",
+    "Tooltip": "Displays live OpenAI Codex status (Idle / Running / Waiting Approval / Done) and focuses the active IDE or terminal session"
   },
   "com.vibecoding.codex.approval": {
-    "Name": "응답 제어 (승인/세션허용/중단)",
-    "Tooltip": "Codex 승인(y/Enter), 세션 항상 허용(a), 즉시 중단(Esc / Ctrl+C)"
+    "Name": "Prompt Response (Approve / Session / Stop)",
+    "Tooltip": "Approve (y / Enter), Always Allow Session (a), or Stop Immediately (Esc / Ctrl+C)"
   },
   "com.vibecoding.codex.model": {
-    "Name": "모델 변경 (GPT-6.1 SOL / ASTRA)",
-    "Tooltip": "GPT-6.1 Sol · GPT-6 Astra · GPT-6.1 Terra · GPT-6 Luna 순환/지정 전환"
+    "Name": "Model Switcher (GPT-6.1 Sol / Astra)",
+    "Tooltip": "Cycle or lock GPT-6.1 Sol, GPT-6 Astra, GPT-6.1 Terra, or GPT-6 Luna"
   },
   "com.vibecoding.codex.mode": {
-    "Name": "권한 & 추론 & 샌드박스 설정",
-    "Tooltip": "승인 정책(요청승인/자동수정/완전자율), 추론 강도(Low~XHigh), 샌드박스 모드 전환"
+    "Name": "Approval, Effort & Sandbox",
+    "Tooltip": "Cycle Approval Policy (On-Request / Auto-Edit / Full-Auto), Reasoning Effort (Low~XHigh), or Sandbox Mode"
   },
   "com.vibecoding.codex.command": {
-    "Name": "슬래시 명령어 & 프롬프트",
-    "Tooltip": "/review, /compact, /new, /diff, /ide 및 바이브 프롬프트 원터치 전송"
+    "Name": "Slash Command & Prompt",
+    "Tooltip": "Send /review, /compact, /new, /diff, /ide, or custom vibe prompts to the active session"
   },
   "com.vibecoding.codex.utility": {
-    "Name": "바이브 유틸리티 (음성/스샷/훅)",
-    "Tooltip": "음성 받아쓰기(Win+H), 스샷 첨부(Ctrl+V), Codex 실행, 상태 훅 자동설치"
+    "Name": "Vibe Utility (Voice / Paste / Hooks)",
+    "Tooltip": "Voice Dictation (Win+H / macOS Dictation), Paste Screenshot (Ctrl+V / Cmd+V), Focus Codex, or Auto-Install Hooks"
   },
   "Localization": {}
 }

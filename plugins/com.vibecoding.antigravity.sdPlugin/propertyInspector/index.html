@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Antigravity 바이브코딩 설정</title>
+  <title>Antigravity Vibe Coding Settings</title>
   <style>
     :root {
       --bg: #1e1e1e; --card: #272726; --border: #3a3a38;
@@ -12,7 +12,7 @@
     * { box-sizing: border-box; }
     body {
       margin: 0; padding: 12px 14px 20px; background: var(--bg); color: var(--text);
-      font-family: 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', -apple-system, 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       font-size: 13px; line-height: 1.5;
     }
     .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; margin-bottom: 10px; }
@@ -39,126 +39,126 @@
 </head>
 <body>
   <div class="section">
-    <div class="section-title">LCD 아이콘 표시 스타일</div>
+    <div class="section-title">LCD Icon Display Style</div>
     <select id="displayStyle">
-      <option value="icon_label">대형 벡터 아이콘 + 굵은 라벨 (기본 추천)</option>
-      <option value="icon_only">순수 대형 아이콘만 표시 (무각인 미니멀)</option>
+      <option value="icon_label">Large Vector Icon + Bold Label (Recommended)</option>
+      <option value="icon_only">Pure Large Icon Only (Minimal)</option>
     </select>
   </div>
 
   <div class="section hidden" id="cfg-status">
-    <div class="section-title">Antigravity 구동 상태 설정</div>
+    <div class="section-title">Antigravity Live Status Settings</div>
     <div class="field">
-      <label>패널 모드</label>
+      <label>Panel Mode</label>
       <select id="panelMode">
-        <option value="overview">메인 구동 상태 (대기 / 동작중 / 승인·질문대기 / 완료)</option>
-        <option value="activity">실시간 실행 도구 모니터 (터미널 / 코드편집 / 서브에이전트)</option>
-        <option value="metrics">세션 요약 (현재 모델 · 추론 레벨 · 실행 정책)</option>
+        <option value="overview">Primary Status (Idle / Running / Waiting / Done)</option>
+        <option value="activity">Active Tool Monitor (Terminal / Edit / Subagent)</option>
+        <option value="metrics">Session Summary (Model · Thinking · Policy)</option>
       </select>
     </div>
-    <div class="hint">• 실시간 transcript.jsonl 감시 및 hooks.json 이중 연동 지원</div>
+    <div class="hint">• Dual real-time monitoring via transcript.jsonl and hooks.json</div>
   </div>
 
   <div class="section hidden" id="cfg-approval">
-    <div class="section-title">응답 / 제어 키 설정</div>
+    <div class="section-title">Response &amp; Control Key Settings</div>
     <select id="responseType">
-      <option value="approve">Proceed 승인 / 확인 (Enter, 길게: "진행해줘")</option>
-      <option value="auto_proceed">남은 작업 자동승인 완주 지시 (길게: 숫자 2)</option>
-      <option value="reject">즉시 중단 / 취소 (Esc, 길게: Ctrl+C)</option>
+      <option value="approve">Proceed / Confirm (Enter, Long press: "Proceed")</option>
+      <option value="auto_proceed">Auto-Proceed Remaining Steps (Long press: '2')</option>
+      <option value="reject">Immediate Stop / Cancel (Esc, Long press: Ctrl+C)</option>
     </select>
   </div>
 
   <div class="section hidden" id="cfg-model">
-    <div class="section-title">최신 Antigravity 모델 전환</div>
+    <div class="section-title">Antigravity Model Switcher</div>
     <div class="field">
-      <label>전환 방식</label>
+      <label>Switch Mode</label>
       <select id="modelMode">
-        <option value="cycle">순환 (Gemini 4 → Flash 3.8 → Sonnet 5.5 → Opus 5.5 → Auto)</option>
-        <option value="fixed">특정 모델 고정</option>
+        <option value="cycle">Cycle (Gemini 4 → Flash 3.8 → Sonnet 5.5 → Opus 5.5 → Auto)</option>
+        <option value="fixed">Fixed Target Model</option>
       </select>
     </div>
     <div class="field" id="targetModelWrap">
-      <label>지정 모델</label>
+      <label>Target Model</label>
       <select id="targetModel">
-        <option value="argon">Gemini 4 Argon (gemini-4-argon · 플래그십 추론)</option>
-        <option value="flash">Gemini 3.8 Flash (gemini-3.8-flash · 초고속 에이전트)</option>
+        <option value="argon">Gemini 4 Argon (gemini-4-argon · Flagship Reasoning)</option>
+        <option value="flash">Gemini 3.8 Flash (gemini-3.8-flash · Ultra-Fast Agent)</option>
         <option value="sonnet">Claude Sonnet 5.5 Thinking (claude-sonnet-5-5)</option>
         <option value="opus">Claude Opus 5.5 Thinking (claude-opus-5-5)</option>
-        <option value="auto">Auto (작업별 자동 최적 모델)</option>
+        <option value="auto">Auto (Optimal model per task)</option>
       </select>
     </div>
     <label class="check-row">
-      <input type="checkbox" id="modelSendSlash" />
-      CLI 사용 시 <code>/model</code> 명령도 함께 입력
+      <input type="checkbox" id="modelSendSlash" checked />
+      Sync settings.json and send <code>/model</code> to active IDE (Orca, etc.) / CLI session
     </label>
   </div>
 
   <div class="section hidden" id="cfg-mode">
-    <div class="section-title">실행 정책 &amp; 추론 레벨</div>
+    <div class="section-title">Execution Policy &amp; Thinking Level</div>
     <select id="settingType">
-      <option value="exec_policy">실행 정책 순환 (검토실행 ↔ 샌드박스 ↔ 자율진행)</option>
-      <option value="thinking">Thinking 추론 강도 순환 (Low → Med → High)</option>
-      <option value="sandbox">터미널 샌드박스 ON / OFF 토글</option>
+      <option value="exec_policy">Cycle Execution Policy (Review ↔ Sandbox ↔ Auto)</option>
+      <option value="thinking">Cycle Thinking Effort (Low → Med → High)</option>
+      <option value="sandbox">Toggle Terminal Sandbox ON / OFF</option>
     </select>
   </div>
 
   <div class="section hidden" id="cfg-command">
-    <div class="section-title">AGY 슬래시 워크플로우 &amp; 프롬프트</div>
+    <div class="section-title">AGY Slash Workflows &amp; Prompts</div>
     <div class="field">
-      <label>추천 프리셋</label>
+      <label>Preset</label>
       <select id="preset">
-        <option value="plan">/plan 단계별 설계 (길게: /grill-me 인터뷰)</option>
-        <option value="boost">/boost 심층 다각도 검증 (길게: /goal 자율완주)</option>
-        <option value="compact">/compact 컨텍스트 압축 (길게: /learn 패턴학습)</option>
-        <option value="teamwork">/teamwork 멀티에이전트 협업 (길게: /browser 웹검증)</option>
-        <option value="vibe_fix">바이브 프롬프트: 전체 빌드 &amp; 테스트 오류 수정</option>
-        <option value="vibe_commit">바이브 프롬프트: 변경 요약 &amp; Git 커밋 (길게: /schedule)</option>
-        <option value="custom">직접 입력</option>
+        <option value="plan">/plan Step-by-Step Plan (Long press: /grill-me)</option>
+        <option value="boost">/boost Deep Multi-Angle Verification (Long press: /goal)</option>
+        <option value="compact">/compact Compact Context (Long press: /learn)</option>
+        <option value="teamwork">/teamwork Multi-Agent Teamwork (Long press: /browser)</option>
+        <option value="vibe_fix">Vibe Prompt: Full build, test &amp; fix failures</option>
+        <option value="vibe_commit">Vibe Prompt: Summarize changes &amp; git commit (Long press: /schedule)</option>
+        <option value="custom">Custom Input</option>
       </select>
     </div>
     <div class="field">
-      <label>커스텀 라벨 (비워두면 기본 아이콘명)</label>
-      <input type="text" id="label" placeholder="플랜" />
+      <label>Custom Label (Leave blank for default)</label>
+      <input type="text" id="label" placeholder="PLAN" />
     </div>
     <div class="field">
-      <label>짧게 누를 때 전송할 텍스트</label>
+      <label>Short-Press Text</label>
       <textarea id="commandText"></textarea>
     </div>
     <div class="field">
-      <label>길게 누를 때 전송할 텍스트</label>
+      <label>Long-Press Text</label>
       <input type="text" id="longPressCommand" />
     </div>
     <label class="check-row">
       <input type="checkbox" id="autoEnter" />
-      전송 후 자동 Enter 실행
+      Press Enter automatically after sending
     </label>
   </div>
 
   <div class="section hidden" id="cfg-utility">
-    <div class="section-title">바이브 유틸리티</div>
+    <div class="section-title">Vibe Utility</div>
     <select id="utilType">
-      <option value="voice">음성 바이브 입력 (Win+H / macOS 받아쓰기)</option>
-      <option value="screenshot">스샷 첨부 (Ctrl+V / Cmd+V, 길게: 영역캡처)</option>
-      <option value="launch">Antigravity 창 포커스 / 실행</option>
-      <option value="install_hooks">~/.gemini/config/hooks.json 설치 &amp; 데모</option>
+      <option value="voice">Voice Dictation (Win+H / macOS Dictation)</option>
+      <option value="screenshot">Paste Screenshot (Ctrl+V / Cmd+V, Long press: Snip)</option>
+      <option value="launch">Focus / Launch Antigravity</option>
+      <option value="install_hooks">Install ~/.gemini/config/hooks.json &amp; Run Demo</option>
     </select>
   </div>
 
   <div class="section">
     <div class="section-title">
-      <span>실시간 상태 테스트 (LCD 즉시 반영)</span>
-      <span id="hookBadge" class="badge">✓ AGY 감시중</span>
+      <span>Live LCD State Test</span>
+      <span id="hookBadge" class="badge">✓ AGY Active</span>
     </div>
     <div class="btn-grid">
-      <button type="button" data-sim="IDLE">대기</button>
-      <button type="button" data-sim="RUNNING">동작중</button>
-      <button type="button" data-sim="WAITING_PERMISSION">승인대기</button>
-      <button type="button" data-sim="WAITING_INPUT">질문대기</button>
-      <button type="button" data-sim="COMPLETED">완료</button>
-      <button type="button" id="btnDemo">▶ 데모</button>
+      <button type="button" data-sim="IDLE">Idle</button>
+      <button type="button" data-sim="RUNNING">Running</button>
+      <button type="button" data-sim="WAITING_PERMISSION">Permit</button>
+      <button type="button" data-sim="WAITING_INPUT">Question</button>
+      <button type="button" data-sim="COMPLETED">Done</button>
+      <button type="button" id="btnDemo">▶ Demo</button>
     </div>
-    <button type="button" class="primary" id="btnInstallHooks">~/.gemini/config/hooks.json 자동 설정/복구</button>
-    <div class="hint" id="liveSummary">연결 대기 중...</div>
+    <button type="button" class="primary" id="btnInstallHooks">Configure / Repair ~/.gemini/config/hooks.json</button>
+    <div class="hint" id="liveSummary">Waiting for connection...</div>
   </div>
 
   <script>
@@ -168,8 +168,8 @@
       boost:       { commandText: '/boost ',    longPressCommand: '/goal ',     autoEnter: false },
       compact:     { commandText: '/compact',   longPressCommand: '/learn ',    autoEnter: true },
       teamwork:    { commandText: '/teamwork ', longPressCommand: '/browser ',  autoEnter: false },
-      vibe_fix:    { commandText: '전체 빌드와 테스트를 실행해 검증하고 실패한 부분이 있으면 원인을 찾아 수정해줘', longPressCommand: '', autoEnter: true },
-      vibe_commit: { commandText: 'git status와 diff를 확인해 변경사항을 요약하고 적절한 커밋 메시지로 git commit 해줘', longPressCommand: '/schedule ', autoEnter: true }
+      vibe_fix:    { commandText: 'Run the full build and test suite to verify everything, and fix any failures found.', longPressCommand: '', autoEnter: true },
+      vibe_commit: { commandText: 'Check git status and diff, summarize the changes, and create a git commit with a clear message.', longPressCommand: '/schedule ', autoEnter: true }
     };
 
     function showSection() {
@@ -191,7 +191,7 @@
       if (s.responseType) document.getElementById('responseType').value = s.responseType;
       if (s.modelMode) document.getElementById('modelMode').value = s.modelMode;
       if (s.targetModel) document.getElementById('targetModel').value = s.targetModel;
-      document.getElementById('modelSendSlash').checked = s.sendSlashCommand === true;
+      document.getElementById('modelSendSlash').checked = s.sendSlashCommand !== false;
       document.getElementById('targetModelWrap').style.display =
         document.getElementById('modelMode').value === 'fixed' ? 'block' : 'none';
       if (s.settingType) document.getElementById('settingType').value = s.settingType;
@@ -264,7 +264,7 @@
           if (msg.event === 'sendToPropertyInspector' && msg.payload && msg.payload.state) {
             const st = msg.payload.state;
             document.getElementById('liveSummary').textContent =
-              `상태: ${st.state} | 모델: ${st.modelDisplay} | 추론: ${st.thinkingLevel.toUpperCase()} | 타일: ${st.connectedContexts}개`;
+              `State: ${st.state} | Model: ${st.modelDisplay} | Thinking: ${st.thinkingLevel.toUpperCase()} | Tiles: ${st.connectedContexts}`;
           }
         } catch (_) {}
       };

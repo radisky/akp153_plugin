@@ -2,7 +2,7 @@
   "Actions": [
     {
       "Icon": "static/icon-status.png",
-      "Name": "에이전트 구동 상태",
+      "Name": "Agent Live Status",
       "DisableAutomaticStates": true,
       "States": [
         {
@@ -18,13 +18,13 @@
       "Controllers": ["Keypad", "Information"],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": true,
-      "Tooltip": "Antigravity 에이전트 실시간 구동 상태(대기/동작중/승인·질문대기/완료) 표시 및 앱·터미널 포커스",
+      "Tooltip": "Display real-time Antigravity agent status (Idle / Running / Waiting / Done) and focus active IDE, Orca, or Terminal session",
       "UUID": "com.vibecoding.antigravity.status",
       "PropertyInspectorPath": "propertyInspector/index.html"
     },
     {
       "Icon": "static/icon-approve.png",
-      "Name": "응답 제어 (승인/자동승인/중단)",
+      "Name": "Response Control (Proceed / Auto / Stop)",
       "DisableAutomaticStates": true,
       "States": [
         {
@@ -41,13 +41,13 @@
       "Controllers": ["Keypad"],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": true,
-      "Tooltip": "Antigravity Proceed 승인(Enter), 남은 작업 자동승인 완주, 즉시 중단(Esc / Ctrl+C)",
+      "Tooltip": "Proceed approval (Enter), auto-proceed remaining steps, or immediate stop/interrupt (Esc / Ctrl+C)",
       "UUID": "com.vibecoding.antigravity.approval",
       "PropertyInspectorPath": "propertyInspector/index.html"
     },
     {
       "Icon": "static/icon-model.png",
-      "Name": "모델 변경 (Gemini 4 / 5.5)",
+      "Name": "Model Switcher (Gemini 4 / 5.5)",
       "DisableAutomaticStates": true,
       "States": [
         {
@@ -59,19 +59,19 @@
       "Settings": {
         "modelMode": "cycle",
         "targetModel": "argon",
-        "sendSlashCommand": false,
+        "sendSlashCommand": true,
         "displayStyle": "icon_label"
       },
       "Controllers": ["Keypad", "Information"],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": true,
-      "Tooltip": "Gemini 4 Argon · Flash 3.8 · Sonnet 5.5 · Opus 5.5 · Auto 순환/지정 전환",
+      "Tooltip": "Cycle or select Gemini 4 Argon, Flash 3.8, Sonnet 5.5, Opus 5.5, or Auto (syncs settings.json and sends /model to active session)",
       "UUID": "com.vibecoding.antigravity.model",
       "PropertyInspectorPath": "propertyInspector/index.html"
     },
     {
       "Icon": "static/icon-mode.png",
-      "Name": "정책 & 추론 강도 (Policy/Thinking)",
+      "Name": "Policy & Thinking Level",
       "DisableAutomaticStates": true,
       "States": [
         {
@@ -87,13 +87,13 @@
       "Controllers": ["Keypad", "Information"],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": true,
-      "Tooltip": "실행 정책(검토실행/샌드박스/자율진행), Thinking 강도(Low/Med/High), 샌드박스 ON/OFF",
+      "Tooltip": "Cycle execution policy (Request Review / Sandbox / Always Proceed), thinking effort (Low/Med/High), or toggle sandbox",
       "UUID": "com.vibecoding.antigravity.mode",
       "PropertyInspectorPath": "propertyInspector/index.html"
     },
     {
       "Icon": "static/icon-cmd.png",
-      "Name": "슬래시 워크플로우 & 프롬프트",
+      "Name": "Slash Workflows & Prompts",
       "DisableAutomaticStates": true,
       "States": [
         {
@@ -113,13 +113,13 @@
       "Controllers": ["Keypad"],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": true,
-      "Tooltip": "Antigravity 전용 /plan, /boost, /goal, /teamwork, /compact 및 바이브 프롬프트 전송",
+      "Tooltip": "Send Antigravity slash workflows (/plan, /boost, /goal, /teamwork, /compact) and vibe coding prompts to active session",
       "UUID": "com.vibecoding.antigravity.command",
       "PropertyInspectorPath": "propertyInspector/index.html"
     },
     {
       "Icon": "static/icon-util.png",
-      "Name": "바이브 유틸리티 (음성/스샷/훅)",
+      "Name": "Vibe Utility (Voice / Paste / Hooks)",
       "DisableAutomaticStates": true,
       "States": [
         {
@@ -135,19 +135,19 @@
       "Controllers": ["Keypad"],
       "UserTitleEnabled": false,
       "SupportedInMultiActions": true,
-      "Tooltip": "음성 입력(Win+H / Mac 받아쓰기), 스마트 스샷 첨부(Ctrl+V / Cmd+V), AGY 실행, hooks.json 설정",
+      "Tooltip": "Voice dictation (Win+H / macOS Dictation), smart screenshot paste (Ctrl+V / Cmd+V), launch Antigravity, or configure hooks.json",
       "UUID": "com.vibecoding.antigravity.utility",
       "PropertyInspectorPath": "propertyInspector/index.html"
     }
   ],
   "SDKVersion": 1,
   "Author": "VibeCoding",
-  "Name": "Antigravity 바이브코딩",
+  "Name": "Antigravity Vibe Coding",
   "Icon": "static/category.png",
   "CodePathWin": "plugin/index.js",
   "CodePathMac": "plugin/index.js",
-  "Description": "Google Antigravity 실시간 구동 상태 모니터 및 바이브코딩 컨트롤러",
-  "Category": "Antigravity 바이브코딩",
+  "Description": "Real-time Google Antigravity agent status monitor and vibe coding controller for IDE, Orca, and Terminal sessions",
+  "Category": "Antigravity Vibe Coding",
   "CategoryIcon": "static/category.png",
   "Version": "1.0.0",
   "URL": "https://antigravity.google/docs",

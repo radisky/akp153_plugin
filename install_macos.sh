@@ -162,8 +162,8 @@ fi
 
 echo ""
 echo "====================================================================="
-echo " macOS 설치 완료! (Claude Code · Antigravity · OpenAI Codex)"
-echo " 1. Stream Dock 앱을 재시작하세요."
-echo " 2. 키 입력 제어를 위해 [시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용]"
-echo "    에서 Stream Dock (및 osascript) 권한을 허용해 주세요."
+echo " macOS Installation Complete! (Claude Code · Antigravity · OpenAI Codex)"
+echo " 1. Restart the Stream Dock app."
+echo " 2. Grant Accessibility permission to Stream Dock (and osascript) under"
+echo "    [System Settings > Privacy & Security > Accessibility]."
 echo "====================================================================="
